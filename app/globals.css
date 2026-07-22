@@ -1,26 +1,75 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+    scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    font-family: var(--font-body), system-ui, sans-serif;
+    background: #f8f6f1;
+    color: #141414;
+    antialiasing: auto;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: var(--font-heading), system-ui, sans-serif;
+    letter-spacing: -0.045em;
+}
+
+button,
+input,
+select,
+textarea,
+a {
+    font-family: var(--font-body), system-ui, sans-serif;
+}
+
+::selection {
+    background: #c9a227;
+    color: #141414;
+}
+
+.booking-input {
+    min-height: 3.5rem;
+    width: 100%;
+    border: 1px solid #ded7ca;
+    border-radius: 1rem;
+    background: #fffdf8;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    font: inherit;
+    font-weight: 600;
+    color: #171717;
+    outline: none;
+    transition:
+            border-color 180ms ease,
+            box-shadow 180ms ease,
+            background 180ms ease;
+}
+
+.booking-input:focus {
+    border-color: #b68a2d;
+    box-shadow: 0 0 0 4px rgb(182 138 45 / 14%);
+}
+
+.dark .booking-input {
+    border-color: rgb(255 255 255 / 10%);
+    background: rgb(255 255 255 / 5%);
+    color: #f7f1e5;
+}
+
+.dark .booking-input:focus {
+    border-color: #d8bd72;
+    box-shadow: 0 0 0 4px rgb(216 189 114 / 12%);
+}
+
+.booking-input::placeholder {
+    color: #9d968b;
 }
