@@ -610,14 +610,6 @@ function BookingForm() {
                 Date.now() - confirmationTime <=
                 AGREEMENT_CONFIRMATION_LIMIT_MS;
 
-            /*
-             * Consume the confirmation immediately so
-             * it cannot unlock future reservations.
-             */
-            window.localStorage.removeItem(
-                AGREEMENT_STORAGE_KEY
-            );
-
             if (confirmationIsValid) {
                 setTermsRead(true);
                 setAgreementAccepted(false);

@@ -6,15 +6,19 @@ import {
     FileSignature,
     ShieldCheck,
 } from "lucide-react";
+
 import {
     useEffect,
-    useRef,
     useState,
 } from "react";
+
 import { useRouter } from "next/navigation";
 
 const AGREEMENT_STORAGE_KEY =
-    "royalwaycc-space-agreement-read-v1";
+    "royalwaycc-space-agreement-read-v2";
+
+const AGREEMENT_CONFIRMATION_LIMIT_MS =
+    30 * 60 * 1000;
 
 const sections = [
     {
@@ -107,70 +111,70 @@ const sections = [
 export default function AgreementPage() {
     const router = useRouter();
 
-    const endMarkerRef =
-        useRef<HTMLDivElement>(null);
-
     const [agreementRead, setAgreementRead] =
         useState(false);
 
     useEffect(() => {
-        const alreadyRead =
+        const storedConfirmation =
             window.localStorage.getItem(
                 AGREEMENT_STORAGE_KEY
-            ) === "true";
+            );
 
-        if (alreadyRead) {
-            setAgreementRead(true);
-        }
-
-        const endMarker = endMarkerRef.current;
-
-        if (!endMarker) {
+        if (!storedConfirmation) {
             return;
         }
 
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (!entry.isIntersecting) {
-                    return;
-                }
+        const confirmationTime =
+            Number(storedConfirmation);
 
-                window.localStorage.setItem(
-                    AGREEMENT_STORAGE_KEY,
-                    "true"
-                );
+        const confirmationIsValid =
+            Number.isFinite(confirmationTime) &&
+            Date.now() - confirmationTime <=
+            AGREEMENT_CONFIRMATION_LIMIT_MS;
 
-                setAgreementRead(true);
-            },
-            {
-                threshold: 0.65,
-            }
+        if (confirmationIsValid) {
+            setAgreementRead(true);
+        } else {
+            window.localStorage.removeItem(
+                AGREEMENT_STORAGE_KEY
+            );
+        }
+    }, []);
+
+    function confirmAgreementRead() {
+        const confirmationTime =
+            Date.now().toString();
+
+        window.localStorage.setItem(
+            AGREEMENT_STORAGE_KEY,
+            confirmationTime
         );
 
-        observer.observe(endMarker);
+        setAgreementRead(true);
 
-        return () => {
-            observer.disconnect();
-        };
-    }, []);
+        if (window.opener) {
+            window.opener.postMessage(
+                {
+                    type:
+                        "ROYALWAY_AGREEMENT_CONFIRMED",
+                    confirmationTime,
+                },
+                window.location.origin
+            );
+        }
+    }
 
     function returnToBooking() {
         if (!agreementRead) {
-            endMarkerRef.current?.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-            });
-
             return;
         }
 
-        window.close();
+        if (window.opener) {
+            window.close();
+            return;
+        }
 
-        window.setTimeout(() => {
-            if (!window.closed) {
-                router.push("/book");
-            }
-        }, 150);
+        router.push("/book");
     }
 
     return (
@@ -178,7 +182,7 @@ export default function AgreementPage() {
             <article className="mx-auto max-w-4xl">
                 <button
                     type="button"
-                    onClick={returnToBooking}
+                    onClick={() => router.push("/book")}
                     className="inline-flex items-center gap-2 font-bold text-[#6f675a] transition hover:text-[#a77c25] dark:text-white/60"
                 >
                     <ArrowLeft size={18} />
@@ -200,10 +204,9 @@ export default function AgreementPage() {
                     </h1>
 
                     <p className="mt-6 max-w-2xl text-lg leading-8 text-white/60">
-                        Please read these terms
-                        carefully before submitting a
-                        reservation and completing
-                        payment.
+                        Please read these terms carefully
+                        before submitting a reservation
+                        and completing payment.
                     </p>
                 </header>
 
@@ -217,17 +220,14 @@ export default function AgreementPage() {
                             </p>
 
                             <p className="mt-2 leading-7">
-                                This is a practical
-                                website agreement
-                                template and should be
-                                reviewed by a
-                                Maryland-licensed
-                                attorney before public
-                                launch, particularly
-                                the cancellation,
-                                indemnity, insurance,
-                                alcohol, refund, and
-                                liability provisions.
+                                This website agreement
+                                should be reviewed by a
+                                Maryland-licensed attorney
+                                before public launch,
+                                particularly the
+                                cancellation, indemnity,
+                                insurance, alcohol, refund,
+                                and liability provisions.
                             </p>
                         </div>
                     </div>
@@ -256,21 +256,19 @@ export default function AgreementPage() {
                     </p>
 
                     <p className="mt-3 leading-7">
-                        The completed booking should
-                        store the agreement version,
-                        customer name, email,
-                        timestamp, IP-related audit
-                        information where appropriate,
+                        Upon successful booking, the
+                        system will record the agreement
+                        version, customer name, email
+                        address, acceptance date and time,
                         selected reservation details,
                         payment reference, and
-                        acceptance confirmation.
+                        confirmation of the
+                        customer&apos;s acceptance of the
+                        rental agreement.
                     </p>
                 </div>
 
-                <div
-                    ref={endMarkerRef}
-                    className="mt-8 rounded-[32px] border border-[#d5c184] bg-[#fff9e8] p-7 shadow-[0_24px_70px_rgba(88,68,22,.1)] dark:border-[#d8bd72]/30 dark:bg-[#1b1d18] md:p-9"
-                >
+                <div className="mt-8 rounded-[32px] border border-[#d5c184] bg-[#fff9e8] p-7 shadow-[0_24px_70px_rgba(88,68,22,.1)] dark:border-[#d8bd72]/30 dark:bg-[#1b1d18] md:p-9">
                     <div className="flex items-start gap-4">
                         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#171914] text-[#d8bd72] dark:bg-[#d8bd72] dark:text-[#171914]">
                             <Check size={22} />
@@ -278,37 +276,48 @@ export default function AgreementPage() {
 
                         <div>
                             <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#9d7623] dark:text-[#d8bd72]">
-                                Agreement completed
+                                Terms acceptance
                             </p>
 
                             <h2 className="mt-3 text-3xl font-bold tracking-[-0.04em]">
-                                You reached the end.
+                                Confirm your review
                             </h2>
 
                             <p className="mt-3 leading-7 text-[#676055] dark:text-white/60">
-                                The agreement checkbox
-                                on the booking page is
-                                now unlocked. Return to
-                                the original booking tab
-                                to continue.
+                                Confirm that you have read
+                                the complete rental
+                                agreement before returning
+                                to the booking form.
                             </p>
                         </div>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={returnToBooking}
-                        className="mt-7 inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#171914] px-7 font-extrabold text-white transition hover:-translate-y-0.5 dark:bg-[#dfc477] dark:text-[#171914]"
-                    >
-                        <ArrowLeft size={18} />
-                        Return to Booking
-                    </button>
+                    {!agreementRead ? (
+                        <button
+                            type="button"
+                            onClick={confirmAgreementRead}
+                            className="mt-7 inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#171914] px-7 font-extrabold text-white transition hover:-translate-y-0.5 dark:bg-[#dfc477] dark:text-[#171914]"
+                        >
+                            <Check size={18} />
+                            I Have Read This Agreement
+                        </button>
+                    ) : (
+                        <>
+                            <p className="mt-6 flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                                <Check size={16} />
+                                Agreement review recorded
+                                successfully.
+                            </p>
 
-                    {agreementRead && (
-                        <p className="mt-4 flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                            <Check size={16} />
-                            Booking checkbox unlocked
-                        </p>
+                            <button
+                                type="button"
+                                onClick={returnToBooking}
+                                className="mt-5 inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#171914] px-7 font-extrabold text-white transition hover:-translate-y-0.5 dark:bg-[#dfc477] dark:text-[#171914]"
+                            >
+                                <ArrowLeft size={18} />
+                                Return to Booking
+                            </button>
+                        </>
                     )}
                 </div>
             </article>
