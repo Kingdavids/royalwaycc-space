@@ -128,8 +128,10 @@ export async function POST(request: NextRequest) {
         }
 
         const rentalSubtotal = pricing.hourlyRate * hours;
-        const siteUrl =
-            process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
+
+        const origin =
+            process.env.NEXT_PUBLIC_SITE_URL ||
+            request.nextUrl.origin;
 
         const session = await stripe.checkout.sessions.create({
             mode: "payment",
@@ -137,10 +139,10 @@ export async function POST(request: NextRequest) {
             customer_email: email,
 
             success_url:
-                `${siteUrl}/payment/success` +
-                "?session_id={CHECKOUT_SESSION_ID}",
+                `${origin}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
 
-            cancel_url: `${siteUrl}/payment/cancel`,
+            cancel_url:
+                `${origin}/book?payment=cancelled`,
 
             billing_address_collection: "required",
 
