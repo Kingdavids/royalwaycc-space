@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { DayPicker } from "@daypicker/react";
+
 import {
     AlertCircle,
     ArrowLeft,
@@ -47,6 +48,9 @@ const AGREEMENT_STORAGE_KEY =
 
 const AGREEMENT_CONFIRMATION_LIMIT_MS =
     30 * 60 * 1000;
+
+const BOOKING_DRAFT_STORAGE_KEY =
+    "royalwaycc-space-booking-draft-v1";
 
 function getTodayDate(): string {
     const today = new Date();
@@ -544,7 +548,6 @@ function EventTimePicker({
 
 function BookingForm() {
     const searchParams = useSearchParams();
-
     const requestedLayout = searchParams.get("layout");
     const requestedHours = Number(searchParams.get("hours"));
 
@@ -560,6 +563,23 @@ function BookingForm() {
             : 3;
 
     const today = useMemo(() => getTodayDate(), []);
+
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [email, setEmail] = useState("");
+    const [phone, setPhone] = useState("");
+    const [organization, setOrganization] = useState("");
+    const [eventType, setEventType] = useState("");
+    const [alcoholProvider, setAlcoholProvider] = useState("");
+    const [alcoholPermitStatus, setAlcoholPermitStatus] = useState("");
+    const [cateringCompany, setCateringCompany] = useState("");
+    const [catererPhone, setCatererPhone] = useState("");
+    const [foodServiceType, setFoodServiceType] =
+        useState("Drop-off catering");
+    const [onSiteCooking, setOnSiteCooking] = useState("No");
+    const [eventDescription, setEventDescription] = useState("");
+    const [specialRequests, setSpecialRequests] = useState("");
+    const [draftRestored, setDraftRestored] = useState(false);
 
     const [layout, setLayout] =
         useState<HallLayout>(initialLayout);
@@ -601,31 +621,149 @@ function BookingForm() {
                 return;
             }
 
-            const confirmationTime = Number(
-                storedConfirmation
-            );
+            const confirmationTime =
+                Number(storedConfirmation);
 
             const confirmationIsValid =
                 Number.isFinite(confirmationTime) &&
                 Date.now() - confirmationTime <=
                 AGREEMENT_CONFIRMATION_LIMIT_MS;
 
-            if (confirmationIsValid) {
-                setTermsRead(true);
+            if (!confirmationIsValid) {
+                window.localStorage.removeItem(
+                    AGREEMENT_STORAGE_KEY
+                );
+
+                setTermsRead(false);
                 setAgreementAccepted(false);
-
-                setErrors((current) => ({
-                    ...current,
-                    agreement: undefined,
-                }));
-
                 return;
             }
 
-            setTermsRead(false);
-            setAgreementAccepted(false);
+            setTermsRead(true);
+
+            setErrors((current) => ({
+                ...current,
+                agreement: undefined,
+            }));
         }
 
+        function restoreBookingDraft() {
+            const savedDraft =
+                window.localStorage.getItem(
+                    BOOKING_DRAFT_STORAGE_KEY
+                );
+
+            if (!savedDraft) {
+                setDraftRestored(true);
+                return;
+            }
+
+            try {
+                const draft = JSON.parse(savedDraft);
+                setFirstName(draft.firstName || "");
+                setLastName(draft.lastName || "");
+                setEmail(draft.email || "");
+                setPhone(draft.phone || "");
+                setOrganization(
+                    draft.organization || ""
+                );
+                setEventType(draft.eventType || "");
+                setEventDate(draft.eventDate || "");
+                setStartTime(draft.startTime || "");
+
+                setLayout(
+                    draft.layout === "round-table"
+                        ? "round-table"
+                        : "theater"
+                );
+
+                setHours(
+                    Number(draft.hours) >= 3
+                        ? Number(draft.hours)
+                        : 3
+                );
+
+                setGuestCount(
+                    draft.guestCount || ""
+                );
+
+                setAlcoholServed(
+                    draft.alcoholServed === "yes"
+                        ? "yes"
+                        : "no"
+                );
+
+                setAlcoholProvider(
+                    draft.alcoholProvider || ""
+                );
+
+                setAlcoholPermitStatus(
+                    draft.alcoholPermitStatus || ""
+                );
+
+                setOutsideCatering(
+                    draft.outsideCatering === "yes"
+                        ? "yes"
+                        : "no"
+                );
+
+                setCateringCompany(
+                    draft.cateringCompany || ""
+                );
+
+                setCatererPhone(
+                    draft.catererPhone || ""
+                );
+
+                setFoodServiceType(
+                    draft.foodServiceType ||
+                    "Drop-off catering"
+                );
+
+                setOnSiteCooking(
+                    draft.onSiteCooking || "No"
+                );
+
+                setEventDescription(
+                    draft.eventDescription || ""
+                );
+
+                setSpecialRequests(
+                    draft.specialRequests || ""
+                );
+
+                setAgreementAccepted(
+                    Boolean(
+                        draft.agreementAccepted
+                    )
+                );
+            } catch {
+                window.localStorage.removeItem(
+                    BOOKING_DRAFT_STORAGE_KEY
+                );
+            } finally {
+                setDraftRestored(true);
+            }
+        }
+
+        function handleAgreementMessage(
+            event: MessageEvent
+        ) {
+            if (event.origin !== window.location.origin) {
+                return;
+            }
+
+            if (
+                event.data?.type !==
+                "ROYALWAY_AGREEMENT_CONFIRMED"
+            ) {
+                return;
+            }
+
+            refreshAgreementStatus();
+        }
+
+        restoreBookingDraft();
         refreshAgreementStatus();
 
         window.addEventListener(
@@ -638,6 +776,11 @@ function BookingForm() {
             refreshAgreementStatus
         );
 
+        window.addEventListener(
+            "message",
+            handleAgreementMessage
+        );
+
         return () => {
             window.removeEventListener(
                 "focus",
@@ -648,8 +791,73 @@ function BookingForm() {
                 "storage",
                 refreshAgreementStatus
             );
+
+            window.removeEventListener(
+                "message",
+                handleAgreementMessage
+            );
         };
     }, []);
+
+    useEffect(() => {
+        if (!draftRestored) {
+            return;
+        }
+
+        const draft = {
+            firstName,
+            lastName,
+            email,
+            phone,
+            organization,
+            eventType,
+            eventDate,
+            startTime,
+            layout,
+            hours,
+            guestCount,
+            alcoholServed,
+            alcoholProvider,
+            alcoholPermitStatus,
+            outsideCatering,
+            cateringCompany,
+            catererPhone,
+            foodServiceType,
+            onSiteCooking,
+            eventDescription,
+            specialRequests,
+            agreementAccepted,
+        };
+
+        window.localStorage.setItem(
+            BOOKING_DRAFT_STORAGE_KEY,
+            JSON.stringify(draft)
+        );
+    }, [
+        draftRestored,
+        firstName,
+        lastName,
+        email,
+        phone,
+        organization,
+        eventType,
+        eventDate,
+        startTime,
+        layout,
+        hours,
+        guestCount,
+        alcoholServed,
+        alcoholProvider,
+        alcoholPermitStatus,
+        outsideCatering,
+        cateringCompany,
+        catererPhone,
+        foodServiceType,
+        onSiteCooking,
+        eventDescription,
+        specialRequests,
+        agreementAccepted,
+    ]);
 
     const estimate = useMemo(
         () => calculateBookingTotal(layout, hours),
@@ -867,6 +1075,15 @@ function BookingForm() {
             <div className="mx-auto max-w-7xl">
                 <Link
                     href="/"
+                    onClick={() => {
+                        window.localStorage.removeItem(
+                            BOOKING_DRAFT_STORAGE_KEY
+                        );
+
+                        window.localStorage.removeItem(
+                            AGREEMENT_STORAGE_KEY
+                        );
+                    }}
                     className="inline-flex items-center gap-2 font-bold text-[#6f675a] transition hover:text-[#a77c25] dark:text-white/60"
                 >
                     <ArrowLeft size={18} />
@@ -902,6 +1119,10 @@ function BookingForm() {
                                     <input
                                         required
                                         name="firstName"
+                                        value={firstName}
+                                        onChange={(event) =>
+                                            setFirstName(event.target.value)
+                                        }
                                         autoComplete="given-name"
                                         className="booking-input"
                                     />
@@ -914,6 +1135,10 @@ function BookingForm() {
                                     <input
                                         required
                                         name="lastName"
+                                        value={lastName}
+                                        onChange={(event) =>
+                                            setLastName(event.target.value)
+                                        }
                                         autoComplete="family-name"
                                         className="booking-input"
                                     />
@@ -927,6 +1152,10 @@ function BookingForm() {
                                         required
                                         type="email"
                                         name="email"
+                                        value={email}
+                                        onChange={(event) =>
+                                            setEmail(event.target.value)
+                                        }
                                         autoComplete="email"
                                         className="booking-input"
                                     />
@@ -940,6 +1169,10 @@ function BookingForm() {
                                         required
                                         type="tel"
                                         name="phone"
+                                        value={phone}
+                                        onChange={(event) =>
+                                            setPhone(event.target.value)
+                                        }
                                         autoComplete="tel"
                                         className="booking-input"
                                     />
@@ -948,6 +1181,10 @@ function BookingForm() {
                                 <FormField label="Organization">
                                     <input
                                         name="organization"
+                                        value={organization}
+                                        onChange={(event) =>
+                                            setOrganization(event.target.value)
+                                        }
                                         className="booking-input"
                                         placeholder="Optional"
                                     />
@@ -960,7 +1197,10 @@ function BookingForm() {
                                     <select
                                         required
                                         name="eventType"
-                                        defaultValue=""
+                                        value={eventType}
+                                        onChange={(event) =>
+                                            setEventType(event.target.value)
+                                        }
                                         className="booking-input"
                                     >
                                         <option
@@ -1228,6 +1468,12 @@ function BookingForm() {
                                             <input
                                                 required
                                                 name="alcoholProvider"
+                                                value={alcoholProvider}
+                                                onChange={(event) =>
+                                                    setAlcoholProvider(
+                                                        event.target.value
+                                                    )
+                                                }
                                                 className="booking-input"
                                                 placeholder="Bartender, caterer, organization, or host"
                                             />
@@ -1240,7 +1486,12 @@ function BookingForm() {
                                             <select
                                                 required
                                                 name="alcoholPermitStatus"
-                                                defaultValue=""
+                                                value={alcoholPermitStatus}
+                                                onChange={(event) =>
+                                                    setAlcoholPermitStatus(
+                                                        event.target.value
+                                                    )
+                                                }
                                                 className="booking-input"
                                             >
                                                 <option
@@ -1295,6 +1546,12 @@ function BookingForm() {
                                             <input
                                                 required
                                                 name="cateringCompany"
+                                                value={cateringCompany}
+                                                onChange={(event) =>
+                                                    setCateringCompany(
+                                                        event.target.value
+                                                    )
+                                                }
                                                 className="booking-input"
                                             />
                                         </FormField>
@@ -1307,6 +1564,12 @@ function BookingForm() {
                                                 required
                                                 type="tel"
                                                 name="catererPhone"
+                                                value={catererPhone}
+                                                onChange={(event) =>
+                                                    setCatererPhone(
+                                                        event.target.value
+                                                    )
+                                                }
                                                 className="booking-input"
                                             />
                                         </FormField>
@@ -1314,7 +1577,12 @@ function BookingForm() {
                                         <FormField label="Type of Food Service">
                                             <select
                                                 name="foodServiceType"
-                                                defaultValue="Drop-off catering"
+                                                value={foodServiceType}
+                                                onChange={(event) =>
+                                                    setFoodServiceType(
+                                                        event.target.value
+                                                    )
+                                                }
                                                 className="booking-input"
                                             >
                                                 <option>
@@ -1341,7 +1609,12 @@ function BookingForm() {
                                         <FormField label="On-Site Cooking">
                                             <select
                                                 name="onSiteCooking"
-                                                defaultValue="No"
+                                                value={onSiteCooking}
+                                                onChange={(event) =>
+                                                    setOnSiteCooking(
+                                                        event.target.value
+                                                    )
+                                                }
                                                 className="booking-input"
                                             >
                                                 <option>
@@ -1366,6 +1639,12 @@ function BookingForm() {
                                     <textarea
                                         required
                                         name="eventDescription"
+                                        value={eventDescription}
+                                        onChange={(event) =>
+                                            setEventDescription(
+                                                event.target.value
+                                            )
+                                        }
                                         rows={5}
                                         className="booking-input min-h-36 resize-y py-4"
                                         placeholder="Describe your event, activities, decorations, vendors, catering, music, and special requirements."
@@ -1377,6 +1656,12 @@ function BookingForm() {
                                 <FormField label="Special Requests">
                                     <textarea
                                         name="specialRequests"
+                                        value={specialRequests}
+                                        onChange={(event) =>
+                                            setSpecialRequests(
+                                                event.target.value
+                                            )
+                                        }
                                         rows={4}
                                         className="booking-input min-h-28 resize-y py-4"
                                         placeholder="Accessibility needs, setup requests, equipment, arrival instructions, or other details."
@@ -1423,15 +1708,15 @@ function BookingForm() {
                                 <span className="text-sm leading-7 text-[#625c51] dark:text-white/65">
                                     I have reviewed and agree
                                     to the{" "}
-                                    <Link
+                                    <a
                                         href="/agreement"
                                         target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="font-extrabold text-[#8d681d] underline underline-offset-4 dark:text-[#e0c373]"
+                                        rel="opener"
+                                        className="font-extrabold underline decoration-[#d8bd72] decoration-2 underline-offset-4"
                                     >
                                         RoyalwayCC Space Rental
                                         Agreement
-                                    </Link>
+                                    </a>
                                     , including the payment,
                                     cancellation, capacity,
                                     damage, cleaning, overtime,

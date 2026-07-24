@@ -6,12 +6,10 @@ import {
     FileSignature,
     ShieldCheck,
 } from "lucide-react";
-
 import {
     useEffect,
     useState,
 } from "react";
-
 import { useRouter } from "next/navigation";
 
 const AGREEMENT_STORAGE_KEY =
@@ -110,7 +108,6 @@ const sections = [
 
 export default function AgreementPage() {
     const router = useRouter();
-
     const [agreementRead, setAgreementRead] =
         useState(false);
 
@@ -152,7 +149,7 @@ export default function AgreementPage() {
 
         setAgreementRead(true);
 
-        if (window.opener) {
+        if (window.opener && !window.opener.closed) {
             window.opener.postMessage(
                 {
                     type:
@@ -169,7 +166,8 @@ export default function AgreementPage() {
             return;
         }
 
-        if (window.opener) {
+        if (window.opener && !window.opener.closed) {
+            window.opener.focus();
             window.close();
             return;
         }
@@ -194,15 +192,12 @@ export default function AgreementPage() {
                         className="text-[#d8bd72]"
                         size={38}
                     />
-
                     <p className="mt-8 text-xs font-extrabold uppercase tracking-[0.28em] text-[#d8bd72]">
                         RoyalwayCC Space
                     </p>
-
                     <h1 className="mt-4 text-5xl font-bold leading-[0.94] tracking-[-0.05em] md:text-7xl">
                         Space Rental Agreement
                     </h1>
-
                     <p className="mt-6 max-w-2xl text-lg leading-8 text-white/60">
                         Please read these terms carefully
                         before submitting a reservation
@@ -213,21 +208,14 @@ export default function AgreementPage() {
                 <div className="mt-8 rounded-[34px] border border-[#d8bd72]/50 bg-[#fff8e5] p-6 text-[#5f4b1f] dark:border-[#d8bd72]/25 dark:bg-[#2a271c] dark:text-[#eadba7]">
                     <div className="flex items-start gap-4">
                         <ShieldCheck className="mt-1 shrink-0" />
-
                         <div>
                             <p className="font-extrabold">
                                 Important review notice
                             </p>
-
                             <p className="mt-2 leading-7">
-                                This website agreement
-                                should be reviewed by a
-                                Maryland-licensed attorney
-                                before public launch,
-                                particularly the
-                                cancellation, indemnity,
-                                insurance, alcohol, refund,
-                                and liability provisions.
+                                Review the complete agreement,
+                                then confirm your review at the
+                                bottom of this page.
                             </p>
                         </div>
                     </div>
@@ -242,7 +230,6 @@ export default function AgreementPage() {
                             <h2 className="text-2xl font-bold tracking-[-0.035em]">
                                 {section.title}
                             </h2>
-
                             <p className="mt-4 leading-8 text-[#676055] dark:text-white/60">
                                 {section.content}
                             </p>
@@ -254,17 +241,12 @@ export default function AgreementPage() {
                     <p className="font-extrabold">
                         Agreement record
                     </p>
-
                     <p className="mt-3 leading-7">
-                        Upon successful booking, the
-                        system will record the agreement
-                        version, customer name, email
-                        address, acceptance date and time,
-                        selected reservation details,
-                        payment reference, and
-                        confirmation of the
-                        customer&apos;s acceptance of the
-                        rental agreement.
+                        Upon successful booking, the system
+                        will record the agreement version,
+                        customer details, acceptance date and
+                        time, reservation details, and payment
+                        reference.
                     </p>
                 </div>
 
@@ -273,21 +255,18 @@ export default function AgreementPage() {
                         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#171914] text-[#d8bd72] dark:bg-[#d8bd72] dark:text-[#171914]">
                             <Check size={22} />
                         </span>
-
                         <div>
                             <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#9d7623] dark:text-[#d8bd72]">
                                 Terms acceptance
                             </p>
-
                             <h2 className="mt-3 text-3xl font-bold tracking-[-0.04em]">
                                 Confirm your review
                             </h2>
-
                             <p className="mt-3 leading-7 text-[#676055] dark:text-white/60">
-                                Confirm that you have read
-                                the complete rental
-                                agreement before returning
-                                to the booking form.
+                                Confirming does not reload or
+                                leave this page. It reveals the
+                                button that returns you to your
+                                filled booking form.
                             </p>
                         </div>
                     </div>
@@ -305,8 +284,7 @@ export default function AgreementPage() {
                         <>
                             <p className="mt-6 flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-300">
                                 <Check size={16} />
-                                Agreement review recorded
-                                successfully.
+                                Agreement review recorded successfully.
                             </p>
 
                             <button
@@ -315,7 +293,7 @@ export default function AgreementPage() {
                                 className="mt-5 inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#171914] px-7 font-extrabold text-white transition hover:-translate-y-0.5 dark:bg-[#dfc477] dark:text-[#171914]"
                             >
                                 <ArrowLeft size={18} />
-                                Return to Booking
+                                Back to Booking
                             </button>
                         </>
                     )}
