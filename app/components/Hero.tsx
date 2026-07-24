@@ -32,7 +32,7 @@ export default function Hero() {
                     className="flex shrink-0 items-center rounded-xl outline-none transition focus-visible:ring-2 focus-visible:ring-[#ead9a2]"
                 >
                     <Image
-                        src="/images/logo.png"
+                        src="/icon.png"
                         alt="Royalway Christian Centre"
                         width={170}
                         height={58}

@@ -28,7 +28,7 @@ import {
     calculateBookingTotal,
     hallPricing,
     type HallLayout,
-} from "../lib/pricing";
+} from "@/app/lib/pricing";
 
 type FormErrors = {
     eventDate?: string;
