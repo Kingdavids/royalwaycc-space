@@ -1,30 +1,28 @@
 import type { MetadataRoute } from "next";
 
-const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    "https://royalwaycc.org";
+import { getAbsoluteUrl } from "./lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
     const lastModified = new Date();
 
     return [
         {
-            url: siteUrl,
+            url: getAbsoluteUrl("/"),
             lastModified,
             changeFrequency: "weekly",
             priority: 1,
         },
         {
-            url: `${siteUrl}/book`,
+            url: getAbsoluteUrl("/book"),
             lastModified,
             changeFrequency: "weekly",
             priority: 0.9,
         },
         {
-            url: `${siteUrl}/agreement`,
+            url: getAbsoluteUrl("/agreement"),
             lastModified,
-            changeFrequency: "monthly",
-            priority: 0.5,
+            changeFrequency: "yearly",
+            priority: 0.3,
         },
     ];
 }

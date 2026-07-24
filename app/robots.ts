@@ -1,8 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    "https://booking.royalwaycc.org";
+import { getAbsoluteUrl } from "./lib/site";
 
 export default function robots(): MetadataRoute.Robots {
     return {
@@ -12,11 +10,12 @@ export default function robots(): MetadataRoute.Robots {
             disallow: [
                 "/api/",
                 "/admin/",
-                "/checkout/",
+                "/success/",
+                "/cancelled/",
             ],
         },
 
-        sitemap: `${siteUrl}/sitemap.xml`,
-        host: siteUrl,
+        sitemap: getAbsoluteUrl("/sitemap.xml"),
+        host: getAbsoluteUrl("/"),
     };
 }

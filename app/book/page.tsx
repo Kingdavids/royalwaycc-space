@@ -6,10 +6,12 @@ import {
     Suspense,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { DayPicker } from "@daypicker/react";
 import {
     AlertCircle,
     ArrowLeft,
@@ -38,14 +40,13 @@ type FormErrors = {
 type CheckoutResponse = {
     url?: string;
     error?: string;
-    fields?: Record<string, string>;
 };
 
 const AGREEMENT_STORAGE_KEY =
-    "royalwaycc-space-agreement-read-v1";
+    "royalwaycc-space-agreement-read-v2";
 
-const BOOKING_DRAFT_STORAGE_KEY =
-    "royalwaycc-space-booking-draft-v1";
+const AGREEMENT_CONFIRMATION_LIMIT_MS =
+    30 * 60 * 1000;
 
 function getTodayDate(): string {
     const today = new Date();
@@ -64,8 +65,14 @@ function calculateEndTime(
         return "";
     }
 
-    const [startHour, startMinute] = startTime.split(":").map(Number);
-    const totalMinutes = startHour * 60 + startMinute + durationHours * 60;
+    const [startHour, startMinute] = startTime
+        .split(":")
+        .map(Number);
+
+    const totalMinutes =
+        startHour * 60 +
+        startMinute +
+        durationHours * 60;
 
     const endDayOffset = Math.floor(totalMinutes / 1440);
     const endMinutes = totalMinutes % 1440;
@@ -89,33 +96,450 @@ function calculateEndTime(
         : formattedTime;
 }
 
-function calculateEndTimeValue(
-    startTime: string,
-    durationHours: number
-): string {
-    if (!startTime) {
-        return "";
-    }
 
-    const [startHour, startMinute] = startTime.split(":").map(Number);
-    const totalMinutes =
-        startHour * 60 +
-        startMinute +
-        durationHours * 60;
+function formatDateValue(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
 
-    const normalizedMinutes = totalMinutes % 1440;
-    const endHour = Math.floor(normalizedMinutes / 60);
-    const endMinute = normalizedMinutes % 60;
-
-    return `${String(endHour).padStart(2, "0")}:${String(
-        endMinute
-    ).padStart(2, "0")}`;
+    return `${year}-${month}-${day}`;
 }
 
-function normalizeYesNo(value: unknown): "yes" | "no" {
-    return String(value).trim().toLowerCase() === "yes"
-        ? "yes"
-        : "no";
+function parseDateValue(value: string): Date | undefined {
+    if (!value) {
+        return undefined;
+    }
+
+    const [year, month, day] = value.split("-").map(Number);
+
+    if (!year || !month || !day) {
+        return undefined;
+    }
+
+    return new Date(year, month - 1, day);
+}
+
+function formatDisplayDate(value: string): string {
+    const date = parseDateValue(value);
+
+    if (!date) {
+        return "Select event date";
+    }
+
+    return date.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+    });
+}
+
+function EventDatePicker({
+                             value,
+                             minimumDate,
+                             error,
+                             onChange,
+                         }: {
+    value: string;
+    minimumDate: string;
+    error?: string;
+    onChange: (value: string) => void;
+}) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isOpen, setIsOpen] = useState(false);
+
+    const selectedDate = parseDateValue(value);
+    const firstAllowedDate =
+        parseDateValue(minimumDate) ?? new Date();
+
+    const finalAllowedDate = new Date(
+        firstAllowedDate.getFullYear() + 2,
+        firstAllowedDate.getMonth(),
+        firstAllowedDate.getDate()
+    );
+
+    useEffect(() => {
+        function handlePointerDown(event: PointerEvent) {
+            if (
+                containerRef.current &&
+                !containerRef.current.contains(
+                    event.target as Node
+                )
+            ) {
+                setIsOpen(false);
+            }
+        }
+
+        function handleEscape(event: KeyboardEvent) {
+            if (event.key === "Escape") {
+                setIsOpen(false);
+            }
+        }
+
+        document.addEventListener(
+            "pointerdown",
+            handlePointerDown
+        );
+        document.addEventListener(
+            "keydown",
+            handleEscape
+        );
+
+        return () => {
+            document.removeEventListener(
+                "pointerdown",
+                handlePointerDown
+            );
+            document.removeEventListener(
+                "keydown",
+                handleEscape
+            );
+        };
+    }, []);
+
+    return (
+        <div
+            ref={containerRef}
+            className="royalway-date-picker"
+        >
+            <input
+                type="hidden"
+                name="eventDate"
+                value={value}
+            />
+
+            <button
+                type="button"
+                onClick={() =>
+                    setIsOpen((current) => !current)
+                }
+                aria-haspopup="dialog"
+                aria-expanded={isOpen}
+                aria-invalid={Boolean(error)}
+                className={`booking-input royalway-date-trigger ${
+                    error
+                        ? "royalway-date-trigger-error"
+                        : ""
+                }`}
+            >
+                <span
+                    className={
+                        value
+                            ? "royalway-date-value"
+                            : "royalway-date-placeholder"
+                    }
+                >
+                    {formatDisplayDate(value)}
+                </span>
+
+                <CalendarDays
+                    size={19}
+                    aria-hidden="true"
+                    className="royalway-date-icon"
+                />
+            </button>
+
+            {isOpen && (
+                <div
+                    role="dialog"
+                    aria-label="Choose event date"
+                    className="royalway-calendar-popover"
+                >
+                    <DayPicker
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => {
+                            if (!date) {
+                                return;
+                            }
+
+                            onChange(formatDateValue(date));
+                            setIsOpen(false);
+                        }}
+                        disabled={{
+                            before: firstAllowedDate,
+                        }}
+                        startMonth={firstAllowedDate}
+                        endMonth={finalAllowedDate}
+                        showOutsideDays
+                        fixedWeeks
+                        className="royalway-calendar"
+                    />
+
+                    <div className="royalway-calendar-footer">
+                        <span>
+                            Available dates begin today.
+                        </span>
+
+                        {value && (
+                            <button
+                                type="button"
+                                onClick={() => onChange("")}
+                                className="royalway-calendar-clear"
+                            >
+                                Clear date
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+
+function formatTimeLabel(value: string): string {
+    if (!value) {
+        return "Select start time";
+    }
+
+    return new Date(
+        `2000-01-01T${value}:00`
+    ).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+    });
+}
+
+function buildTimeOptions(): {
+    value: string;
+    label: string;
+    period: "Morning" | "Afternoon" | "Evening";
+}[] {
+    const options: {
+        value: string;
+        label: string;
+        period: "Morning" | "Afternoon" | "Evening";
+    }[] = [];
+
+    for (let hour = 8; hour <= 23; hour++) {
+        for (const minute of [0, 30]) {
+            if (hour === 23 && minute === 30) {
+                continue;
+            }
+
+            const value =
+                `${String(hour).padStart(2, "0")}:` +
+                `${String(minute).padStart(2, "0")}`;
+
+            const label = new Date(
+                `2000-01-01T${value}:00`
+            ).toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+            });
+
+            const period =
+                hour < 12
+                    ? "Morning"
+                    : hour < 17
+                        ? "Afternoon"
+                        : "Evening";
+
+            options.push({
+                value,
+                label,
+                period,
+            });
+        }
+    }
+
+    return options;
+}
+
+const BOOKING_TIME_OPTIONS = buildTimeOptions();
+
+function EventTimePicker({
+                             value,
+                             error,
+                             onChange,
+                         }: {
+    value: string;
+    error?: string;
+    onChange: (value: string) => void;
+}) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        function handlePointerDown(event: PointerEvent) {
+            if (
+                containerRef.current &&
+                !containerRef.current.contains(
+                    event.target as Node
+                )
+            ) {
+                setIsOpen(false);
+            }
+        }
+
+        function handleEscape(event: KeyboardEvent) {
+            if (event.key === "Escape") {
+                setIsOpen(false);
+            }
+        }
+
+        document.addEventListener(
+            "pointerdown",
+            handlePointerDown
+        );
+        document.addEventListener(
+            "keydown",
+            handleEscape
+        );
+
+        return () => {
+            document.removeEventListener(
+                "pointerdown",
+                handlePointerDown
+            );
+            document.removeEventListener(
+                "keydown",
+                handleEscape
+            );
+        };
+    }, []);
+
+    const periods = [
+        "Morning",
+        "Afternoon",
+        "Evening",
+    ] as const;
+
+    return (
+        <div
+            ref={containerRef}
+            className="royalway-time-picker"
+        >
+            <input
+                type="hidden"
+                name="startTime"
+                value={value}
+            />
+
+            <button
+                type="button"
+                onClick={() =>
+                    setIsOpen((current) => !current)
+                }
+                aria-haspopup="listbox"
+                aria-expanded={isOpen}
+                aria-invalid={Boolean(error)}
+                className={`booking-input royalway-time-trigger ${
+                    error
+                        ? "royalway-time-trigger-error"
+                        : ""
+                }`}
+            >
+                <span
+                    className={
+                        value
+                            ? "royalway-time-value"
+                            : "royalway-time-placeholder"
+                    }
+                >
+                    {formatTimeLabel(value)}
+                </span>
+
+                <Clock3
+                    size={19}
+                    aria-hidden="true"
+                    className="royalway-time-icon"
+                />
+            </button>
+
+            {isOpen && (
+                <div
+                    role="listbox"
+                    aria-label="Choose start time"
+                    className="royalway-time-popover"
+                >
+                    <div className="royalway-time-heading">
+                        <div>
+                            <p className="royalway-time-eyebrow">
+                                Event start
+                            </p>
+
+                            <p className="royalway-time-title">
+                                Choose a time
+                            </p>
+                        </div>
+
+                        {value && (
+                            <button
+                                type="button"
+                                onClick={() => onChange("")}
+                                className="royalway-time-clear"
+                            >
+                                Clear
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="royalway-time-groups">
+                        {periods.map((period) => (
+                            <section
+                                key={period}
+                                className="royalway-time-group"
+                            >
+                                <p className="royalway-time-period">
+                                    {period}
+                                </p>
+
+                                <div className="royalway-time-grid">
+                                    {BOOKING_TIME_OPTIONS
+                                        .filter(
+                                            (option) =>
+                                                option.period ===
+                                                period
+                                        )
+                                        .map((option) => {
+                                            const isSelected =
+                                                value ===
+                                                option.value;
+
+                                            return (
+                                                <button
+                                                    key={
+                                                        option.value
+                                                    }
+                                                    type="button"
+                                                    role="option"
+                                                    aria-selected={
+                                                        isSelected
+                                                    }
+                                                    onClick={() => {
+                                                        onChange(
+                                                            option.value
+                                                        );
+                                                        setIsOpen(
+                                                            false
+                                                        );
+                                                    }}
+                                                    className={`royalway-time-option ${
+                                                        isSelected
+                                                            ? "royalway-time-option-selected"
+                                                            : ""
+                                                    }`}
+                                                >
+                                                    {
+                                                        option.label
+                                                    }
+                                                </button>
+                                            );
+                                        })}
+                                </div>
+                            </section>
+                        ))}
+                    </div>
+
+                    <p className="royalway-time-note">
+                        Times are shown in 30-minute intervals.
+                    </p>
+                </div>
+            )}
+        </div>
+    );
 }
 
 function BookingForm() {
@@ -130,7 +554,8 @@ function BookingForm() {
             : "theater";
 
     const initialHours =
-        Number.isFinite(requestedHours) && requestedHours >= 3
+        Number.isFinite(requestedHours) &&
+        requestedHours >= 3
             ? Math.min(requestedHours, 12)
             : 3;
 
@@ -139,42 +564,18 @@ function BookingForm() {
     const [layout, setLayout] =
         useState<HallLayout>(initialLayout);
 
-    const [firstName, setFirstName] = useState("");
-    const [lastName, setLastName] = useState("");
-    const [email, setEmail] = useState("");
-    const [phone, setPhone] = useState("");
-    const [organization, setOrganization] =
-        useState("");
-    const [eventType, setEventType] = useState("");
-    const [eventDescription, setEventDescription] =
-        useState("");
-    const [specialRequests, setSpecialRequests] =
-        useState("");
-    const [alcoholProvider, setAlcoholProvider] =
-        useState("");
-    const [
-        alcoholPermitStatus,
-        setAlcoholPermitStatus,
-    ] = useState("");
-    const [cateringCompany, setCateringCompany] =
-        useState("");
-    const [catererPhone, setCatererPhone] =
-        useState("");
-    const [foodServiceType, setFoodServiceType] =
-        useState("Drop-off catering");
-    const [onSiteCooking, setOnSiteCooking] =
-        useState("no");
-
     const [hours, setHours] = useState(initialHours);
     const [eventDate, setEventDate] = useState("");
     const [startTime, setStartTime] = useState("");
     const [guestCount, setGuestCount] = useState("");
+
     const [agreementAccepted, setAgreementAccepted] =
         useState(false);
 
     const [termsRead, setTermsRead] = useState(false);
     const [isSubmitting, setIsSubmitting] =
         useState(false);
+
     const [paymentError, setPaymentError] =
         useState("");
 
@@ -184,101 +585,53 @@ function BookingForm() {
     const [outsideCatering, setOutsideCatering] =
         useState("no");
 
-    const [errors, setErrors] = useState<FormErrors>({});
+    const [errors, setErrors] =
+        useState<FormErrors>({});
 
     useEffect(() => {
         function refreshAgreementStatus() {
-            const agreementWasRead =
+            const storedConfirmation =
                 window.localStorage.getItem(
                     AGREEMENT_STORAGE_KEY
-                ) === "true";
+                );
 
-            setTermsRead(agreementWasRead);
-
-            if (!agreementWasRead) {
+            if (!storedConfirmation) {
+                setTermsRead(false);
                 setAgreementAccepted(false);
+                return;
             }
-        }
 
-        const savedDraft =
-            window.localStorage.getItem(
-                BOOKING_DRAFT_STORAGE_KEY
+            const confirmationTime = Number(
+                storedConfirmation
             );
 
-        if (savedDraft) {
-            try {
-                const draft = JSON.parse(savedDraft);
+            const confirmationIsValid =
+                Number.isFinite(confirmationTime) &&
+                Date.now() - confirmationTime <=
+                AGREEMENT_CONFIRMATION_LIMIT_MS;
 
-                setFirstName(draft.firstName || "");
-                setLastName(draft.lastName || "");
-                setEmail(draft.email || "");
-                setPhone(draft.phone || "");
-                setOrganization(
-                    draft.organization || ""
-                );
-                setEventType(draft.eventType || "");
-                setEventDate(draft.eventDate || "");
-                setStartTime(draft.startTime || "");
-                setLayout(
-                    draft.layout === "round-table"
-                        ? "round-table"
-                        : "theater"
-                );
-                setHours(
-                    Number(draft.hours) >= 3
-                        ? Number(draft.hours)
-                        : 3
-                );
-                setGuestCount(
-                    draft.guestCount || ""
-                );
-                setAlcoholServed(
-                    String(draft.alcoholServed).toLowerCase() === "yes"
-                        ? "yes"
-                        : "no"
-                );
-                setAlcoholProvider(
-                    draft.alcoholProvider || ""
-                );
-                setAlcoholPermitStatus(
-                    draft.alcoholPermitStatus || ""
-                );
-                setOutsideCatering(
-                    String(draft.outsideCatering).toLowerCase() === "yes"
-                        ? "yes"
-                        : "no"
-                );
-                setCateringCompany(
-                    draft.cateringCompany || ""
-                );
-                setCatererPhone(
-                    draft.catererPhone || ""
-                );
-                setFoodServiceType(
-                    draft.foodServiceType ||
-                    "Drop-off catering"
-                );
-                setOnSiteCooking(
-                    draft.onSiteCooking === "yes"
-                        ? "yes"
-                        : "no"
-                );
-                setEventDescription(
-                    draft.eventDescription || ""
-                );
-                setSpecialRequests(
-                    draft.specialRequests || ""
-                );
-                setAgreementAccepted(
-                    Boolean(
-                        draft.agreementAccepted
-                    )
-                );
-            } catch {
-                window.localStorage.removeItem(
-                    BOOKING_DRAFT_STORAGE_KEY
-                );
+            /*
+             * Consume the confirmation immediately so
+             * it cannot unlock future reservations.
+             */
+            window.localStorage.removeItem(
+                AGREEMENT_STORAGE_KEY
+            );
+
+            if (confirmationIsValid) {
+                setTermsRead(true);
+                setAgreementAccepted(false);
+
+                setErrors((current) => ({
+                    ...current,
+                    agreement: undefined,
+                }));
+
+                return;
             }
+
+            setTermsRead(false);
+            setAgreementAccepted(false);
         }
 
         refreshAgreementStatus();
@@ -306,61 +659,6 @@ function BookingForm() {
         };
     }, []);
 
-    useEffect(() => {
-        const draft = {
-            firstName,
-            lastName,
-            email,
-            phone,
-            organization,
-            eventType,
-            eventDate,
-            startTime,
-            layout,
-            hours,
-            guestCount,
-            alcoholServed,
-            alcoholProvider,
-            alcoholPermitStatus,
-            outsideCatering,
-            cateringCompany,
-            catererPhone,
-            foodServiceType,
-            onSiteCooking,
-            eventDescription,
-            specialRequests,
-            agreementAccepted,
-        };
-
-        window.localStorage.setItem(
-            BOOKING_DRAFT_STORAGE_KEY,
-            JSON.stringify(draft)
-        );
-    }, [
-        firstName,
-        lastName,
-        email,
-        phone,
-        organization,
-        eventType,
-        eventDate,
-        startTime,
-        layout,
-        hours,
-        guestCount,
-        alcoholServed,
-        alcoholProvider,
-        alcoholPermitStatus,
-        outsideCatering,
-        cateringCompany,
-        catererPhone,
-        foodServiceType,
-        onSiteCooking,
-        eventDescription,
-        specialRequests,
-        agreementAccepted,
-    ]);
-
     const estimate = useMemo(
         () => calculateBookingTotal(layout, hours),
         [layout, hours]
@@ -374,24 +672,21 @@ function BookingForm() {
         [startTime, hours]
     );
 
-    const calculatedEndTimeValue = useMemo(
-        () => calculateEndTimeValue(startTime, hours),
-        [startTime, hours]
-    );
-
     function validateBooking(): FormErrors {
         const newErrors: FormErrors = {};
         const guestTotal = Number(guestCount);
 
         if (!eventDate) {
-            newErrors.eventDate = "Select an event date.";
+            newErrors.eventDate =
+                "Select an event date.";
         } else if (eventDate < today) {
             newErrors.eventDate =
                 "Past dates cannot be booked.";
         }
 
         if (!startTime) {
-            newErrors.startTime = "Select a start time.";
+            newErrors.startTime =
+                "Select a start time.";
         }
 
         if (eventDate === today && startTime) {
@@ -399,7 +694,9 @@ function BookingForm() {
                 `${eventDate}T${startTime}:00`
             );
 
-            if (selectedStart.getTime() <= Date.now()) {
+            if (
+                selectedStart.getTime() <= Date.now()
+            ) {
                 newErrors.startTime =
                     "The start time must be later than the current time.";
             }
@@ -429,7 +726,9 @@ function BookingForm() {
         setLayout(selectedLayout);
 
         const newMaximum =
-            selectedLayout === "theater" ? 100 : 50;
+            selectedLayout === "theater"
+                ? 100
+                : 50;
 
         if (
             guestCount &&
@@ -444,17 +743,14 @@ function BookingForm() {
         }));
     }
 
+
     async function handleSubmit(
         event: FormEvent<HTMLFormElement>
     ) {
         event.preventDefault();
 
         const form = event.currentTarget;
-        const validationErrors =
-            validateBooking();
-
-        setErrors(validationErrors);
-        setPaymentError("");
+        const newErrors = validateBooking();
 
         if (!form.checkValidity()) {
             form.reportValidity();
@@ -462,29 +758,29 @@ function BookingForm() {
 
         if (
             !form.checkValidity() ||
-            Object.keys(validationErrors).length > 0
+            Object.keys(newErrors).length > 0
         ) {
+            setErrors(newErrors);
+            setPaymentError("");
+
             const firstInvalidField =
                 form.querySelector<HTMLElement>(
-                    "[aria-invalid='true'], :invalid"
+                    ":invalid"
                 );
-
-            firstInvalidField?.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-            });
 
             firstInvalidField?.focus();
             return;
         }
 
-        const formData = new FormData(form);
-
+        setErrors({});
+        setPaymentError("");
         setIsSubmitting(true);
 
         try {
+            const formData = new FormData(form);
+
             const response = await fetch(
-                "/api/bookings",
+                "/api/checkout",
                 {
                     method: "POST",
                     headers: {
@@ -508,13 +804,11 @@ function BookingForm() {
                             formData.get("eventType"),
                         eventDate,
                         startTime,
-                        endTime: calculatedEndTimeValue,
                         layout,
                         hours,
                         guestCount:
                             Number(guestCount),
-                        alcoholServed:
-                            normalizeYesNo(alcoholServed),
+                        alcoholServed,
                         alcoholProvider:
                             formData.get(
                                 "alcoholProvider"
@@ -523,8 +817,7 @@ function BookingForm() {
                             formData.get(
                                 "alcoholPermitStatus"
                             ),
-                        outsideCatering:
-                            normalizeYesNo(outsideCatering),
+                        outsideCatering,
                         cateringCompany:
                             formData.get(
                                 "cateringCompany"
@@ -538,10 +831,8 @@ function BookingForm() {
                                 "foodServiceType"
                             ),
                         onSiteCooking:
-                            normalizeYesNo(
-                                formData.get(
-                                    "onSiteCooking"
-                                )
+                            formData.get(
+                                "onSiteCooking"
                             ),
                         eventDescription:
                             formData.get(
@@ -552,8 +843,6 @@ function BookingForm() {
                                 "specialRequests"
                             ),
                         agreementAccepted,
-                        agreementVersion:
-                            "2026-07-21",
                         termsRead,
                     }),
                 }
@@ -563,42 +852,11 @@ function BookingForm() {
                 (await response.json()) as CheckoutResponse;
 
             if (!response.ok || !data.url) {
-                if (data.fields) {
-                    setErrors((current) => ({
-                        ...current,
-                        eventDate:
-                            data.fields?.eventDate ||
-                            current.eventDate,
-                        startTime:
-                            data.fields?.startTime ||
-                            data.fields?.hours ||
-                            current.startTime,
-                        guestCount:
-                            data.fields?.guestCount ||
-                            current.guestCount,
-                        agreement:
-                            data.fields?.agreementAccepted ||
-                            data.fields?.agreementVersion ||
-                            current.agreement,
-                    }));
-                }
-
-                const firstFieldError =
-                    Object.values(data.fields || {})[0];
-
                 throw new Error(
-                    firstFieldError ||
-                    (data.error ===
-                    "Please correct the highlighted booking information."
-                        ? "Some booking details were not accepted. Review the highlighted fields and try again."
-                        : data.error) ||
+                    data.error ||
                     "Unable to start the secure payment."
                 );
             }
-
-            window.localStorage.removeItem(
-                BOOKING_DRAFT_STORAGE_KEY
-            );
 
             window.location.assign(data.url);
         } catch (error) {
@@ -634,9 +892,9 @@ function BookingForm() {
                         </h1>
 
                         <p className="mt-5 max-w-2xl text-lg leading-8 text-[#716a5e] dark:text-white/60">
-                            Complete the required details, review the
-                            rental agreement, and proceed to secure
-                            online payment.
+                            Complete the required details,
+                            review the rental agreement, and
+                            proceed to secure online payment.
                         </p>
 
                         <form
@@ -653,12 +911,6 @@ function BookingForm() {
                                         required
                                         name="firstName"
                                         autoComplete="given-name"
-                                        value={firstName}
-                                        onChange={(event) =>
-                                            setFirstName(
-                                                event.target.value
-                                            )
-                                        }
                                         className="booking-input"
                                     />
                                 </FormField>
@@ -671,12 +923,6 @@ function BookingForm() {
                                         required
                                         name="lastName"
                                         autoComplete="family-name"
-                                        value={lastName}
-                                        onChange={(event) =>
-                                            setLastName(
-                                                event.target.value
-                                            )
-                                        }
                                         className="booking-input"
                                     />
                                 </FormField>
@@ -690,12 +936,6 @@ function BookingForm() {
                                         type="email"
                                         name="email"
                                         autoComplete="email"
-                                        value={email}
-                                        onChange={(event) =>
-                                            setEmail(
-                                                event.target.value
-                                            )
-                                        }
                                         className="booking-input"
                                     />
                                 </FormField>
@@ -709,12 +949,6 @@ function BookingForm() {
                                         type="tel"
                                         name="phone"
                                         autoComplete="tel"
-                                        value={phone}
-                                        onChange={(event) =>
-                                            setPhone(
-                                                event.target.value
-                                            )
-                                        }
                                         className="booking-input"
                                     />
                                 </FormField>
@@ -722,12 +956,6 @@ function BookingForm() {
                                 <FormField label="Organization">
                                     <input
                                         name="organization"
-                                        value={organization}
-                                        onChange={(event) =>
-                                            setOrganization(
-                                                event.target.value
-                                            )
-                                        }
                                         className="booking-input"
                                         placeholder="Optional"
                                     />
@@ -740,31 +968,42 @@ function BookingForm() {
                                     <select
                                         required
                                         name="eventType"
-                                        value={eventType}
-                                        onChange={(event) =>
-                                            setEventType(
-                                                event.target.value
-                                            )
-                                        }
+                                        defaultValue=""
                                         className="booking-input"
                                     >
-                                        <option value="" disabled>
+                                        <option
+                                            value=""
+                                            disabled
+                                        >
                                             Select event type
                                         </option>
-
-                                        <option>Church Event</option>
-                                        <option>Corporate Meeting</option>
+                                        <option>
+                                            Church Event
+                                        </option>
+                                        <option>
+                                            Corporate Meeting
+                                        </option>
                                         <option>
                                             Training or Seminar
                                         </option>
-                                        <option>Birthday Party</option>
-                                        <option>Baby Shower</option>
-                                        <option>Reception</option>
-                                        <option>Community Event</option>
+                                        <option>
+                                            Birthday Party
+                                        </option>
+                                        <option>
+                                            Baby Shower
+                                        </option>
+                                        <option>
+                                            Reception
+                                        </option>
+                                        <option>
+                                            Community Event
+                                        </option>
                                         <option>
                                             Private Celebration
                                         </option>
-                                        <option>Other</option>
+                                        <option>
+                                            Other
+                                        </option>
                                     </select>
                                 </FormField>
 
@@ -773,24 +1012,23 @@ function BookingForm() {
                                     required
                                     error={errors.eventDate}
                                 >
-                                    <input
-                                        required
-                                        type="date"
-                                        name="eventDate"
-                                        min={today}
+                                    <EventDatePicker
                                         value={eventDate}
-                                        onChange={(event) => {
-                                            setEventDate(event.target.value);
+                                        minimumDate={today}
+                                        error={errors.eventDate}
+                                        onChange={(selectedDate) => {
+                                            setEventDate(
+                                                selectedDate
+                                            );
 
-                                            setErrors((current) => ({
-                                                ...current,
-                                                eventDate: undefined,
-                                            }));
+                                            setErrors(
+                                                (current) => ({
+                                                    ...current,
+                                                    eventDate:
+                                                    undefined,
+                                                })
+                                            );
                                         }}
-                                        aria-invalid={
-                                            Boolean(errors.eventDate)
-                                        }
-                                        className="booking-input"
                                     />
                                 </FormField>
 
@@ -799,23 +1037,22 @@ function BookingForm() {
                                     required
                                     error={errors.startTime}
                                 >
-                                    <input
-                                        required
-                                        type="time"
-                                        name="startTime"
+                                    <EventTimePicker
                                         value={startTime}
-                                        onChange={(event) => {
-                                            setStartTime(event.target.value);
+                                        error={errors.startTime}
+                                        onChange={(selectedTime) => {
+                                            setStartTime(
+                                                selectedTime
+                                            );
 
-                                            setErrors((current) => ({
-                                                ...current,
-                                                startTime: undefined,
-                                            }));
+                                            setErrors(
+                                                (current) => ({
+                                                    ...current,
+                                                    startTime:
+                                                    undefined,
+                                                })
+                                            );
                                         }}
-                                        aria-invalid={
-                                            Boolean(errors.startTime)
-                                        }
-                                        className="booking-input"
                                     />
                                 </FormField>
 
@@ -829,17 +1066,19 @@ function BookingForm() {
                                         value={layout}
                                         onChange={(event) =>
                                             handleLayoutChange(
-                                                event.target.value as HallLayout
+                                                event.target
+                                                    .value as HallLayout
                                             )
                                         }
                                         className="booking-input"
                                     >
                                         <option value="theater">
-                                            Theater Setting — $105/hour
+                                            Theater Setting —
+                                            $105/hour
                                         </option>
-
                                         <option value="round-table">
-                                            Round-Table Setting — $145/hour
+                                            Round-Table Setting —
+                                            $145/hour
                                         </option>
                                     </select>
                                 </FormField>
@@ -854,23 +1093,24 @@ function BookingForm() {
                                         value={hours}
                                         onChange={(event) =>
                                             setHours(
-                                                Number(event.target.value)
+                                                Number(
+                                                    event.target
+                                                        .value
+                                                )
                                             )
                                         }
                                         className="booking-input"
                                     >
                                         {Array.from(
                                             { length: 10 },
-                                            (_, index) => index + 3
+                                            (_, index) =>
+                                                index + 3
                                         ).map((hour) => (
                                             <option
                                                 key={hour}
                                                 value={hour}
                                             >
-                                                {hour}{" "}
-                                                {hour === 1
-                                                    ? "hour"
-                                                    : "hours"}
+                                                {hour} hours
                                             </option>
                                         ))}
                                     </select>
@@ -879,7 +1119,9 @@ function BookingForm() {
                                 <FormField
                                     label="Expected Guests"
                                     required
-                                    error={errors.guestCount}
+                                    error={
+                                        errors.guestCount
+                                    }
                                     helper={`Maximum ${maximumGuests} guests for this setup.`}
                                 >
                                     <input
@@ -891,13 +1133,17 @@ function BookingForm() {
                                         value={guestCount}
                                         onChange={(event) => {
                                             setGuestCount(
-                                                event.target.value
+                                                event.target
+                                                    .value
                                             );
 
-                                            setErrors((current) => ({
-                                                ...current,
-                                                guestCount: undefined,
-                                            }));
+                                            setErrors(
+                                                (current) => ({
+                                                    ...current,
+                                                    guestCount:
+                                                    undefined,
+                                                })
+                                            );
                                         }}
                                         aria-invalid={Boolean(
                                             errors.guestCount
@@ -924,13 +1170,18 @@ function BookingForm() {
                                         value={alcoholServed}
                                         onChange={(event) =>
                                             setAlcoholServed(
-                                                event.target.value
+                                                event.target
+                                                    .value
                                             )
                                         }
                                         className="booking-input"
                                     >
-                                        <option value="no">No</option>
-                                        <option value="yes">Yes</option>
+                                        <option value="no">
+                                            No
+                                        </option>
+                                        <option value="yes">
+                                            Yes
+                                        </option>
                                     </select>
                                 </FormField>
 
@@ -944,13 +1195,18 @@ function BookingForm() {
                                         value={outsideCatering}
                                         onChange={(event) =>
                                             setOutsideCatering(
-                                                event.target.value
+                                                event.target
+                                                    .value
                                             )
                                         }
                                         className="booking-input"
                                     >
-                                        <option value="no">No</option>
-                                        <option value="yes">Yes</option>
+                                        <option value="no">
+                                            No
+                                        </option>
+                                        <option value="yes">
+                                            Yes
+                                        </option>
                                     </select>
                                 </FormField>
                             </div>
@@ -958,15 +1214,18 @@ function BookingForm() {
                             {alcoholServed === "yes" && (
                                 <div className="mt-6 rounded-[26px] border border-[#d7bd76] bg-[#fff8e3] p-5 dark:border-[#d7bd76]/30 dark:bg-[#2a271c]">
                                     <p className="font-extrabold text-[#654c17] dark:text-[#ead9a2]">
-                                        Alcohol service information
+                                        Alcohol service
+                                        information
                                     </p>
 
                                     <p className="mt-2 text-sm leading-7 text-[#6f5d37] dark:text-white/60">
-                                        Provide details of the person or
-                                        licensed vendor responsible for
-                                        alcohol service. Required permits,
-                                        licensing, and insurance must be
-                                        submitted before the event.
+                                        Provide details of the
+                                        person or licensed vendor
+                                        responsible for alcohol
+                                        service. Required permits,
+                                        licensing, and insurance
+                                        must be submitted before
+                                        the event.
                                     </p>
 
                                     <div className="mt-5 grid gap-5 sm:grid-cols-2">
@@ -977,12 +1236,6 @@ function BookingForm() {
                                             <input
                                                 required
                                                 name="alcoholProvider"
-                                                value={alcoholProvider}
-                                                onChange={(event) =>
-                                                    setAlcoholProvider(
-                                                        event.target.value
-                                                    )
-                                                }
                                                 className="booking-input"
                                                 placeholder="Bartender, caterer, organization, or host"
                                             />
@@ -995,40 +1248,40 @@ function BookingForm() {
                                             <select
                                                 required
                                                 name="alcoholPermitStatus"
-                                                value={alcoholPermitStatus}
-                                                onChange={(event) =>
-                                                    setAlcoholPermitStatus(
-                                                        event.target.value
-                                                    )
-                                                }
+                                                defaultValue=""
                                                 className="booking-input"
                                             >
                                                 <option
                                                     value=""
                                                     disabled
                                                 >
-                                                    Select status
+                                                    Select
+                                                    status
                                                 </option>
-
                                                 <option>
-                                                    Not required for this event
+                                                    Not required
+                                                    for this
+                                                    event
                                                 </option>
-
                                                 <option>
-                                                    Application in progress
+                                                    Application
+                                                    in progress
                                                 </option>
-
                                                 <option>
-                                                    License or permit obtained
+                                                    License or
+                                                    permit
+                                                    obtained
                                                 </option>
-
                                                 <option>
-                                                    Licensed caterer will provide
+                                                    Licensed
+                                                    caterer will
+                                                    provide
                                                     service
                                                 </option>
-
                                                 <option>
-                                                    Unsure — assistance required
+                                                    Unsure —
+                                                    assistance
+                                                    required
                                                 </option>
                                             </select>
                                         </FormField>
@@ -1050,12 +1303,6 @@ function BookingForm() {
                                             <input
                                                 required
                                                 name="cateringCompany"
-                                                value={cateringCompany}
-                                                onChange={(event) =>
-                                                    setCateringCompany(
-                                                        event.target.value
-                                                    )
-                                                }
                                                 className="booking-input"
                                             />
                                         </FormField>
@@ -1068,12 +1315,6 @@ function BookingForm() {
                                                 required
                                                 type="tel"
                                                 name="catererPhone"
-                                                value={catererPhone}
-                                                onChange={(event) =>
-                                                    setCatererPhone(
-                                                        event.target.value
-                                                    )
-                                                }
                                                 className="booking-input"
                                             />
                                         </FormField>
@@ -1081,44 +1322,43 @@ function BookingForm() {
                                         <FormField label="Type of Food Service">
                                             <select
                                                 name="foodServiceType"
-                                                value={foodServiceType}
-                                                onChange={(event) =>
-                                                    setFoodServiceType(
-                                                        event.target.value
-                                                    )
-                                                }
+                                                defaultValue="Drop-off catering"
                                                 className="booking-input"
                                             >
                                                 <option>
-                                                    Drop-off catering
+                                                    Drop-off
+                                                    catering
                                                 </option>
                                                 <option>
-                                                    Buffet service
+                                                    Buffet
+                                                    service
                                                 </option>
                                                 <option>
-                                                    Plated service
+                                                    Plated
+                                                    service
                                                 </option>
-                                                <option>Food stations</option>
-                                                <option>Other</option>
+                                                <option>
+                                                    Food stations
+                                                </option>
+                                                <option>
+                                                    Other
+                                                </option>
                                             </select>
                                         </FormField>
 
                                         <FormField label="On-Site Cooking">
                                             <select
                                                 name="onSiteCooking"
-                                                value={onSiteCooking}
-                                                onChange={(event) =>
-                                                    setOnSiteCooking(
-                                                        event.target.value
-                                                    )
-                                                }
+                                                defaultValue="No"
                                                 className="booking-input"
                                             >
-                                                <option value="no">
+                                                <option>
                                                     No
                                                 </option>
-                                                <option value="yes">
-                                                    Yes — approval required
+                                                <option>
+                                                    Yes —
+                                                    approval
+                                                    required
                                                 </option>
                                             </select>
                                         </FormField>
@@ -1131,36 +1371,24 @@ function BookingForm() {
                                     label="Event Description"
                                     required
                                 >
-                  <textarea
-                      required
-                      name="eventDescription"
-                      rows={5}
-                      value={eventDescription}
-                      onChange={(event) =>
-                          setEventDescription(
-                              event.target.value
-                          )
-                      }
-                      className="booking-input min-h-36 resize-y py-4"
-                      placeholder="Describe your event, activities, decorations, vendors, catering, music, and special requirements."
-                  />
+                                    <textarea
+                                        required
+                                        name="eventDescription"
+                                        rows={5}
+                                        className="booking-input min-h-36 resize-y py-4"
+                                        placeholder="Describe your event, activities, decorations, vendors, catering, music, and special requirements."
+                                    />
                                 </FormField>
                             </div>
 
                             <div className="mt-6">
                                 <FormField label="Special Requests">
-                  <textarea
-                      name="specialRequests"
-                      rows={4}
-                      value={specialRequests}
-                      onChange={(event) =>
-                          setSpecialRequests(
-                              event.target.value
-                          )
-                      }
-                      className="booking-input min-h-28 resize-y py-4"
-                      placeholder="Accessibility needs, setup requests, equipment, arrival instructions, or other details."
-                  />
+                                    <textarea
+                                        name="specialRequests"
+                                        rows={4}
+                                        className="booking-input min-h-28 resize-y py-4"
+                                        placeholder="Accessibility needs, setup requests, equipment, arrival instructions, or other details."
+                                    />
                                 </FormField>
                             </div>
 
@@ -1235,19 +1463,23 @@ function BookingForm() {
                                             checkbox unlocked.
                                         </span>
                                     )}
-
-                                    {errors.agreement && (
-                                        <span className="mt-2 flex items-center gap-2 text-sm font-bold text-red-600 dark:text-red-400">
-                                            <AlertCircle
-                                                size={15}
-                                            />
-                                            {
-                                                errors.agreement
-                                            }
-                                        </span>
-                                    )}
                                 </span>
                             </label>
+
+                            {errors.agreement && (
+                                <div
+                                    role="alert"
+                                    className="mt-4 flex items-start gap-2 rounded-[18px] border border-red-300 bg-red-50 px-5 py-4 text-sm font-bold text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200"
+                                >
+                                    <AlertCircle
+                                        size={17}
+                                        className="mt-0.5 shrink-0"
+                                    />
+                                    {
+                                        errors.agreement
+                                    }
+                                </div>
+                            )}
 
                             {paymentError && (
                                 <div
@@ -1280,8 +1512,8 @@ function BookingForm() {
 
                             <p className="mt-4 flex items-center justify-center gap-2 text-center text-sm text-[#777064] dark:text-white/45">
                                 <LockKeyhole size={15} />
-                                Availability will be verified before
-                                Stripe payment begins.
+                                Availability will be verified
+                                before Stripe payment begins.
                             </p>
                         </form>
                     </section>
@@ -1298,48 +1530,87 @@ function BookingForm() {
 
                             <div className="mt-7 space-y-5 border-y border-white/10 py-7">
                                 <SummaryRow
-                                    icon={<UsersRound size={18} />}
+                                    icon={
+                                        <UsersRound
+                                            size={18}
+                                        />
+                                    }
                                     label="Hall arrangement"
-                                    value={hallPricing[layout].name}
+                                    value={
+                                        hallPricing[
+                                            layout
+                                            ].name
+                                    }
                                 />
 
                                 <SummaryRow
-                                    icon={<Clock3 size={18} />}
+                                    icon={
+                                        <Clock3
+                                            size={18}
+                                        />
+                                    }
                                     label="Rental duration"
                                     value={`${estimate.hours} hours`}
                                 />
 
                                 <SummaryRow
-                                    icon={<CalendarDays size={18} />}
+                                    icon={
+                                        <CalendarDays
+                                            size={18}
+                                        />
+                                    }
                                     label="Capacity"
-                                    value={hallPricing[layout].capacity}
+                                    value={
+                                        hallPricing[
+                                            layout
+                                            ].capacity
+                                    }
                                 />
 
                                 {eventDate && (
                                     <SummaryRow
-                                        icon={<CalendarDays size={18} />}
+                                        icon={
+                                            <CalendarDays
+                                                size={
+                                                    18
+                                                }
+                                            />
+                                        }
                                         label="Event date"
                                         value={new Date(
                                             `${eventDate}T12:00:00`
-                                        ).toLocaleDateString("en-US", {
-                                            weekday: "short",
-                                            month: "short",
-                                            day: "numeric",
-                                            year: "numeric",
-                                        })}
+                                        ).toLocaleDateString(
+                                            "en-US",
+                                            {
+                                                weekday:
+                                                    "short",
+                                                month: "short",
+                                                day: "numeric",
+                                                year: "numeric",
+                                            }
+                                        )}
                                     />
                                 )}
 
                                 {startTime && (
                                     <SummaryRow
-                                        icon={<Clock3 size={18} />}
+                                        icon={
+                                            <Clock3
+                                                size={
+                                                    18
+                                                }
+                                            />
+                                        }
                                         label="Event time"
                                         value={`${new Date(
                                             `2000-01-01T${startTime}:00`
-                                        ).toLocaleTimeString("en-US", {
-                                            hour: "numeric",
-                                            minute: "2-digit",
-                                        })} – ${calculatedEndTime}`}
+                                        ).toLocaleTimeString(
+                                            "en-US",
+                                            {
+                                                hour: "numeric",
+                                                minute: "2-digit",
+                                            }
+                                        )} – ${calculatedEndTime}`}
                                     />
                                 )}
                             </div>
@@ -1347,12 +1618,16 @@ function BookingForm() {
                             <div className="mt-7 space-y-4">
                                 <PriceRow
                                     label={`${estimate.hours} hours × $${estimate.hourlyRate}`}
-                                    amount={estimate.rentalSubtotal}
+                                    amount={
+                                        estimate.rentalSubtotal
+                                    }
                                 />
 
                                 <PriceRow
                                     label="Refundable damage deposit"
-                                    amount={estimate.damageDeposit}
+                                    amount={
+                                        estimate.damageDeposit
+                                    }
                                 />
                             </div>
 
@@ -1374,10 +1649,12 @@ function BookingForm() {
                             </div>
 
                             <p className="mt-4 text-sm leading-6 text-white/45">
-                                The $100 damage deposit will be
-                                initiated for return within 48 hours
-                                after the event, following inspection
-                                and subject to documented deductions.
+                                The $100 damage deposit
+                                will be initiated for
+                                return within 48 hours
+                                after the event, following
+                                inspection and subject to
+                                documented deductions.
                             </p>
 
                             <div className="mt-7 flex gap-3 rounded-[22px] bg-white/[0.06] p-4 text-sm leading-6 text-white/55">
@@ -1387,96 +1664,17 @@ function BookingForm() {
                                 />
 
                                 <p>
-                                    Booking is confirmed only after
-                                    availability is verified, payment
-                                    succeeds, and the reservation is
-                                    accepted.
+                                    Booking is confirmed
+                                    only after availability
+                                    is verified, payment
+                                    succeeds, and the
+                                    reservation is accepted.
                                 </p>
                             </div>
                         </div>
                     </aside>
                 </div>
             </div>
-
-            <style jsx global>{`
-                .booking-input {
-                    width: 100%;
-                    min-height: 3.5rem;
-                    border: 1px solid #ded7ca;
-                    border-radius: 1rem;
-                    background: #ffffff;
-                    padding: 0.875rem 1rem;
-                    color: #24211c;
-                    font-weight: 600;
-                    outline: none;
-                    transition:
-                        border-color 180ms ease,
-                        box-shadow 180ms ease,
-                        background-color 180ms ease;
-                }
-
-                .booking-input::placeholder {
-                    color: #9a9285;
-                    opacity: 1;
-                }
-
-                .booking-input:hover {
-                    border-color: #c7bda9;
-                }
-
-                .booking-input:focus {
-                    border-color: #a77c25;
-                    box-shadow: 0 0 0 4px rgba(167, 124, 37, 0.14);
-                }
-
-                .booking-input[aria-invalid="true"],
-                .booking-input:invalid:not(:placeholder-shown) {
-                    border-color: #dc6262;
-                }
-
-                select.booking-input {
-                    cursor: pointer;
-                }
-
-                select.booking-input option {
-                    background: #ffffff;
-                    color: #24211c;
-                }
-
-                input[type="date"].booking-input,
-                input[type="time"].booking-input {
-                    color-scheme: light;
-                }
-
-                .dark .booking-input {
-                    border-color: rgba(255, 255, 255, 0.13);
-                    background: #22251f;
-                    color: #f7f1e5;
-                }
-
-                .dark .booking-input::placeholder {
-                    color: rgba(255, 255, 255, 0.38);
-                }
-
-                .dark .booking-input:hover {
-                    border-color: rgba(223, 196, 119, 0.38);
-                }
-
-                .dark .booking-input:focus {
-                    border-color: #dfc477;
-                    box-shadow: 0 0 0 4px rgba(223, 196, 119, 0.13);
-                }
-
-                .dark select.booking-input option {
-                    background: #22251f;
-                    color: #f7f1e5;
-                }
-
-                .dark input[type="date"].booking-input,
-                .dark input[type="time"].booking-input {
-                    color-scheme: dark;
-                }
-            `}</style>
         </main>
     );
 }
@@ -1496,28 +1694,28 @@ function FormField({
 }) {
     return (
         <label className="block">
-      <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] text-[#776f61] dark:text-white/55">
-        {label}
+            <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] text-[#776f61] dark:text-white/55">
+                {label}
 
-          {required && (
-              <span className="ml-1 text-[#a77c25]">
-            *
-          </span>
-          )}
-      </span>
+                {required && (
+                    <span className="ml-1 text-[#a77c25]">
+                        *
+                    </span>
+                )}
+            </span>
 
             {children}
 
             {error ? (
                 <span className="mt-2 flex items-center gap-1.5 text-sm font-bold text-red-600 dark:text-red-400">
-          <AlertCircle size={14} />
+                    <AlertCircle size={14} />
                     {error}
-        </span>
+                </span>
             ) : (
                 helper && (
                     <span className="mt-2 block text-xs text-[#8b8478] dark:text-white/35">
-            {helper}
-          </span>
+                        {helper}
+                    </span>
                 )
             )}
         </label>
@@ -1535,16 +1733,18 @@ function SummaryRow({
 }) {
     return (
         <div className="flex gap-3">
-      <span className="mt-1 text-[#d8bd72]">
-        {icon}
-      </span>
+            <span className="mt-1 text-[#d8bd72]">
+                {icon}
+            </span>
 
             <div>
                 <p className="text-sm text-white/45">
                     {label}
                 </p>
 
-                <p className="mt-1 font-bold">{value}</p>
+                <p className="mt-1 font-bold">
+                    {value}
+                </p>
             </div>
         </div>
     );
@@ -1559,11 +1759,13 @@ function PriceRow({
 }) {
     return (
         <div className="flex justify-between gap-5">
-      <span className="text-white/55">
-        {label}
-      </span>
+            <span className="text-white/55">
+                {label}
+            </span>
 
-            <span className="font-bold">${amount}</span>
+            <span className="font-bold">
+                ${amount}
+            </span>
         </div>
     );
 }

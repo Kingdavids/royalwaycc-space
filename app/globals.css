@@ -1,5 +1,12 @@
 @import "tailwindcss";
+@import "react-day-picker/style.css";
+
 @custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+    --font-sans: var(--font-body);
+    --font-heading: var(--font-heading);
+}
 
 html {
     scroll-behavior: smooth;
@@ -7,10 +14,9 @@ html {
 
 body {
     margin: 0;
-    font-family: var(--font-body), system-ui, sans-serif;
     background: #f8f6f1;
     color: #141414;
-    antialiasing: auto;
+    font-family: var(--font-body), sans-serif;
 }
 
 h1,
@@ -19,8 +25,7 @@ h3,
 h4,
 h5,
 h6 {
-    font-family: var(--font-heading), system-ui, sans-serif;
-    letter-spacing: -0.045em;
+    font-family: var(--font-heading), sans-serif;
 }
 
 button,
@@ -28,13 +33,17 @@ input,
 select,
 textarea,
 a {
-    font-family: var(--font-body), system-ui, sans-serif;
+    font: inherit;
 }
 
 ::selection {
     background: #c9a227;
     color: #141414;
 }
+
+/* =========================================================
+   BOOKING FORM FIELDS
+   ========================================================= */
 
 .booking-input {
     min-height: 3.5rem;
@@ -45,18 +54,32 @@ a {
     padding-left: 1rem;
     padding-right: 1rem;
     font: inherit;
-    font-weight: 600;
+    font-weight: 650;
     color: #171717;
     outline: none;
     transition:
             border-color 180ms ease,
             box-shadow 180ms ease,
-            background 180ms ease;
+            background 180ms ease,
+            transform 180ms ease;
 }
 
-.booking-input:focus {
+.booking-input:hover {
+    border-color: #c8b98f;
+    background: #fffaf1;
+}
+
+.booking-input:focus,
+.booking-input:focus-visible {
     border-color: #b68a2d;
-    box-shadow: 0 0 0 4px rgb(182 138 45 / 14%);
+    background: #fffefb;
+    box-shadow:
+            0 0 0 4px rgb(182 138 45 / 12%),
+            0 10px 30px rgb(74 55 18 / 6%);
+}
+
+.booking-input::placeholder {
+    color: #9d968b;
 }
 
 .dark .booking-input {
@@ -65,11 +88,1078 @@ a {
     color: #f7f1e5;
 }
 
-.dark .booking-input:focus {
-    border-color: #d8bd72;
-    box-shadow: 0 0 0 4px rgb(216 189 114 / 12%);
+.dark .booking-input:hover {
+    border-color: rgb(216 189 114 / 32%);
+    background: rgb(255 255 255 / 7%);
 }
 
-.booking-input::placeholder {
+.dark .booking-input:focus,
+.dark .booking-input:focus-visible {
+    border-color: #d8bd72;
+    box-shadow:
+            0 0 0 4px rgb(216 189 114 / 11%),
+            0 12px 34px rgb(0 0 0 / 20%);
+}
+
+/* =========================================================
+   ROYALWAYCC PREMIUM DATE PICKER
+   ========================================================= */
+
+.royalway-date-picker {
+    position: relative;
+    width: 100%;
+}
+
+.royalway-date-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.9rem;
+    cursor: pointer;
+    text-align: left;
+}
+
+.royalway-date-trigger:hover {
+    border-color: #bca264;
+    background:
+            linear-gradient(180deg, #fffdf8 0%, #fff8e9 100%);
+}
+
+.royalway-date-trigger-error {
+    border-color: #ef4444;
+}
+
+.royalway-date-value {
+    overflow: hidden;
+    color: #181713;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.royalway-date-placeholder {
+    overflow: hidden;
     color: #9d968b;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.royalway-date-icon {
+    flex-shrink: 0;
+    color: #9d7623;
+    filter: drop-shadow(0 4px 8px rgb(157 118 35 / 15%));
+}
+
+.royalway-calendar-popover {
+    position: absolute;
+    z-index: 9999;
+    top: calc(100% + 0.85rem);
+    left: 0;
+    width: min(23rem, calc(100vw - 2rem));
+    overflow: hidden;
+    border: 1px solid rgb(166 133 61 / 22%);
+    border-radius: 1.75rem;
+    background:
+            linear-gradient(180deg, rgb(255 255 255 / 96%), rgb(255 251 241 / 98%));
+    padding: 1rem;
+    color: #171717;
+    box-shadow:
+            0 30px 90px rgb(63 47 15 / 20%),
+            0 14px 36px rgb(63 47 15 / 11%),
+            inset 0 1px 0 rgb(255 255 255 / 90%);
+    backdrop-filter: blur(20px);
+    transform-origin: top left;
+    animation: calendarReveal 180ms ease-out both;
+}
+
+.royalway-calendar-popover::before {
+    position: absolute;
+    top: 0;
+    right: 1.5rem;
+    left: 1.5rem;
+    height: 1px;
+    background:
+            linear-gradient(
+                    90deg,
+                    transparent,
+                    rgb(201 162 39 / 55%),
+                    transparent
+            );
+    content: "";
+}
+
+@keyframes calendarReveal {
+    from {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.985);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.royalway-calendar {
+    width: 100%;
+    margin: 0;
+    --rdp-accent-color: #b68a2d;
+    --rdp-accent-background-color: #f3e7c4;
+    --rdp-day-height: 2.65rem;
+    --rdp-day-width: 2.65rem;
+    --rdp-day_button-height: 2.65rem;
+    --rdp-day_button-width: 2.65rem;
+    --rdp-day_button-border-radius: 999px;
+    --rdp-nav_button-height: 2.45rem;
+    --rdp-nav_button-width: 2.45rem;
+    --rdp-outside-opacity: 0.34;
+    --rdp-disabled-opacity: 0.22;
+    --rdp-today-color: #8f6816;
+}
+
+.royalway-calendar .rdp-months,
+.royalway-calendar .rdp-month {
+    width: 100%;
+    max-width: none;
+}
+
+.royalway-calendar .rdp-month_caption {
+    min-height: 3rem;
+    padding: 0 3.2rem;
+}
+
+.royalway-calendar .rdp-caption_label {
+    font-size: 1.08rem;
+    font-weight: 850;
+    letter-spacing: -0.035em;
+    color: #201d17;
+}
+
+.royalway-calendar .rdp-nav {
+    top: 0;
+    right: 0;
+    left: 0;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.royalway-calendar .rdp-button_previous,
+.royalway-calendar .rdp-button_next {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e5dcc8;
+    border-radius: 999px;
+    background:
+            linear-gradient(180deg, #fffdf8 0%, #f5eddc 100%);
+    color: #6e5317;
+    box-shadow:
+            0 7px 16px rgb(71 53 16 / 8%),
+            inset 0 1px 0 rgb(255 255 255 / 85%);
+    transition:
+            transform 150ms ease,
+            border-color 150ms ease,
+            box-shadow 150ms ease,
+            background 150ms ease;
+}
+
+.royalway-calendar .rdp-button_previous:hover,
+.royalway-calendar .rdp-button_next:hover {
+    transform: translateY(-1px);
+    border-color: #cbae68;
+    background:
+            linear-gradient(180deg, #fffaf0 0%, #efe1bb 100%);
+    box-shadow:
+            0 10px 20px rgb(71 53 16 / 12%),
+            inset 0 1px 0 rgb(255 255 255 / 90%);
+}
+
+.royalway-calendar .rdp-button_previous:active,
+.royalway-calendar .rdp-button_next:active {
+    transform: translateY(0);
+}
+
+.royalway-calendar .rdp-chevron {
+    width: 1rem;
+    height: 1rem;
+    fill: currentColor;
+}
+
+.royalway-calendar .rdp-month_grid {
+    width: 100%;
+    margin-top: 0.55rem;
+    border-collapse: separate;
+    border-spacing: 0.13rem;
+}
+
+.royalway-calendar .rdp-weekday {
+    height: 2rem;
+    padding-bottom: 0.2rem;
+    color: #8f8779;
+    font-size: 0.66rem;
+    font-weight: 850;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+}
+
+.royalway-calendar .rdp-day {
+    padding: 0;
+    text-align: center;
+}
+
+.royalway-calendar .rdp-day_button {
+    position: relative;
+    margin: auto;
+    border: 1px solid transparent;
+    background: transparent;
+    font-size: 0.84rem;
+    font-weight: 760;
+    color: #37332c;
+    transition:
+            transform 140ms ease,
+            border-color 140ms ease,
+            background 140ms ease,
+            color 140ms ease,
+            box-shadow 140ms ease;
+}
+
+.royalway-calendar .rdp-day_button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: #dfcfaa;
+    background:
+            linear-gradient(180deg, #fff8e9 0%, #f2e5c4 100%);
+    color: #6d5116;
+    box-shadow:
+            0 8px 18px rgb(83 61 15 / 9%);
+}
+
+.royalway-calendar .rdp-today:not(.rdp-selected) .rdp-day_button {
+    border-color: #c9a95b;
+    background: #fff9eb;
+    color: #805f19;
+    box-shadow:
+            inset 0 0 0 1px rgb(201 169 91 / 12%);
+}
+
+.royalway-calendar .rdp-selected .rdp-day_button {
+    border-color: #171914;
+    background:
+            linear-gradient(145deg, #272b23 0%, #171914 100%);
+    color: #fffdf8;
+    box-shadow:
+            0 10px 24px rgb(23 25 20 / 26%),
+            inset 0 1px 0 rgb(255 255 255 / 10%);
+}
+
+.royalway-calendar .rdp-selected .rdp-day_button::after {
+    position: absolute;
+    right: 0.55rem;
+    bottom: 0.38rem;
+    left: 0.55rem;
+    height: 2px;
+    border-radius: 999px;
+    background: #d8bd72;
+    content: "";
+}
+
+.royalway-calendar .rdp-outside .rdp-day_button {
+    color: #aaa293;
+}
+
+.royalway-calendar .rdp-disabled .rdp-day_button {
+    cursor: not-allowed;
+    color: #c5beb2;
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+}
+
+.royalway-calendar .rdp-day_button:focus-visible,
+.royalway-calendar .rdp-button_previous:focus-visible,
+.royalway-calendar .rdp-button_next:focus-visible {
+    outline: 3px solid rgb(182 138 45 / 24%);
+    outline-offset: 2px;
+}
+
+.royalway-calendar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.9rem;
+    border-top: 1px solid #eee3cf;
+    padding: 0.95rem 0.15rem 0.1rem;
+    color: #857c6e;
+    font-size: 0.72rem;
+    font-weight: 680;
+}
+
+.royalway-calendar-clear {
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 999px;
+    background: #f3e7c4;
+    padding: 0.45rem 0.75rem;
+    color: #795815;
+    font-size: 0.72rem;
+    font-weight: 850;
+    cursor: pointer;
+    transition:
+            background 150ms ease,
+            transform 150ms ease;
+}
+
+.royalway-calendar-clear:hover {
+    transform: translateY(-1px);
+    background: #ead8a5;
+}
+
+/* =========================================================
+   DARK CALENDAR
+   ========================================================= */
+
+.dark .royalway-date-trigger:hover {
+    border-color: rgb(216 189 114 / 52%);
+    background:
+            linear-gradient(
+                    180deg,
+                    rgb(255 255 255 / 7%),
+                    rgb(216 189 114 / 7%)
+            );
+}
+
+.dark .royalway-date-value {
+    color: #f7f1e5;
+}
+
+.dark .royalway-date-placeholder {
+    color: rgb(255 255 255 / 38%);
+}
+
+.dark .royalway-date-icon {
+    color: #d8bd72;
+}
+
+.dark .royalway-calendar-popover {
+    border-color: rgb(216 189 114 / 18%);
+    background:
+            linear-gradient(
+                    180deg,
+                    rgb(31 34 28 / 98%),
+                    rgb(22 24 20 / 98%)
+            );
+    color: #f7f1e5;
+    box-shadow:
+            0 32px 100px rgb(0 0 0 / 48%),
+            0 12px 32px rgb(0 0 0 / 30%),
+            inset 0 1px 0 rgb(255 255 255 / 5%);
+}
+
+.dark .royalway-calendar-popover::before {
+    background:
+            linear-gradient(
+                    90deg,
+                    transparent,
+                    rgb(216 189 114 / 48%),
+                    transparent
+            );
+}
+
+.dark .royalway-calendar {
+    --rdp-accent-color: #dfc477;
+    --rdp-accent-background-color: rgb(216 189 114 / 14%);
+    --rdp-today-color: #dfc477;
+}
+
+.dark .royalway-calendar .rdp-caption_label {
+    color: #f7f1e5;
+}
+
+.dark .royalway-calendar .rdp-button_previous,
+.dark .royalway-calendar .rdp-button_next {
+    border-color: rgb(255 255 255 / 9%);
+    background:
+            linear-gradient(
+                    180deg,
+                    rgb(255 255 255 / 7%),
+                    rgb(255 255 255 / 3%)
+            );
+    color: #dfc477;
+    box-shadow:
+            0 8px 18px rgb(0 0 0 / 22%),
+            inset 0 1px 0 rgb(255 255 255 / 5%);
+}
+
+.dark .royalway-calendar .rdp-button_previous:hover,
+.dark .royalway-calendar .rdp-button_next:hover {
+    border-color: rgb(216 189 114 / 35%);
+    background: rgb(216 189 114 / 10%);
+}
+
+.dark .royalway-calendar .rdp-weekday {
+    color: rgb(255 255 255 / 38%);
+}
+
+.dark .royalway-calendar .rdp-day_button {
+    color: rgb(255 255 255 / 78%);
+}
+
+.dark .royalway-calendar .rdp-day_button:hover:not(:disabled) {
+    border-color: rgb(216 189 114 / 30%);
+    background: rgb(216 189 114 / 10%);
+    color: #f3df9d;
+    box-shadow:
+            0 8px 20px rgb(0 0 0 / 18%);
+}
+
+.dark .royalway-calendar .rdp-today:not(.rdp-selected) .rdp-day_button {
+    border-color: rgb(216 189 114 / 55%);
+    background: rgb(216 189 114 / 8%);
+    color: #f0d77a;
+}
+
+.dark .royalway-calendar .rdp-selected .rdp-day_button {
+    border-color: #dfc477;
+    background:
+            linear-gradient(145deg, #ead596 0%, #caaa4f 100%);
+    color: #171914;
+    box-shadow:
+            0 10px 26px rgb(0 0 0 / 38%),
+            inset 0 1px 0 rgb(255 255 255 / 35%);
+}
+
+.dark .royalway-calendar .rdp-selected .rdp-day_button::after {
+    background: #171914;
+}
+
+.dark .royalway-calendar .rdp-outside .rdp-day_button {
+    color: rgb(255 255 255 / 24%);
+}
+
+.dark .royalway-calendar .rdp-disabled .rdp-day_button {
+    color: rgb(255 255 255 / 18%);
+}
+
+.dark .royalway-calendar-footer {
+    border-color: rgb(255 255 255 / 8%);
+    color: rgb(255 255 255 / 38%);
+}
+
+.dark .royalway-calendar-clear {
+    background: rgb(216 189 114 / 12%);
+    color: #dfc477;
+}
+
+.dark .royalway-calendar-clear:hover {
+    background: rgb(216 189 114 / 18%);
+}
+
+/* =========================================================
+   EXISTING PAGE ANIMATIONS
+   ========================================================= */
+
+@keyframes heroCinematicZoom {
+    0% {
+        transform: scale(1.02);
+    }
+
+    50% {
+        transform: scale(1.07);
+    }
+
+    100% {
+        transform: scale(1.02);
+    }
+}
+
+@keyframes amenityFadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes planHeadingReveal {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+        filter: blur(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
+@keyframes planShimmer {
+    0%,
+    72% {
+        transform: translateX(0) skewX(-12deg);
+        opacity: 0;
+    }
+
+    78% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateX(500%) skewX(-12deg);
+        opacity: 0;
+    }
+}
+
+@keyframes heroFadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.amenity-card {
+    opacity: 0;
+    animation: amenityFadeUp 0.75s ease-out forwards;
+}
+
+.plan-heading {
+    display: inline-block;
+    animation: planHeadingReveal 0.85s ease-out both;
+}
+
+.plan-shimmer {
+    animation: planShimmer 12s ease-in-out infinite;
+}
+
+.planHeading {
+    display: inline-block;
+    animation: planHeadingReveal 0.8s ease-out;
+}
+
+.planHeading:hover {
+    text-shadow: 0 0 18px rgb(234 217 162 / 35%);
+}
+
+.hero-background {
+    animation: heroCinematicZoom 24s ease-in-out infinite;
+    will-change: transform;
+}
+
+.hero-fade {
+    opacity: 0;
+    animation: heroFadeUp 0.8s ease-out forwards;
+}
+
+.hero-delay-one {
+    animation-delay: 0.1s;
+}
+
+.hero-delay-two {
+    animation-delay: 0.2s;
+}
+
+.hero-delay-three {
+    animation-delay: 0.3s;
+}
+
+.hero-delay-four {
+    animation-delay: 0.4s;
+}
+
+.hero-delay-five {
+    animation-delay: 0.5s;
+}
+
+.hero-delay-six {
+    animation-delay: 0.65s;
+}
+
+/* =========================================================
+   RESPONSIVE CALENDAR
+   ========================================================= */
+
+@media (max-width: 640px) {
+    .royalway-calendar-popover {
+        position: fixed;
+        top: 50%;
+        right: 1rem;
+        left: 1rem;
+        width: auto;
+        max-width: 23rem;
+        margin: auto;
+        transform: translateY(-50%);
+        transform-origin: center;
+        border-radius: 1.65rem;
+        animation: calendarRevealMobile 180ms ease-out both;
+    }
+
+    .royalway-calendar {
+        --rdp-day-height: 2.45rem;
+        --rdp-day-width: 2.45rem;
+        --rdp-day_button-height: 2.45rem;
+        --rdp-day_button-width: 2.45rem;
+    }
+
+    .royalway-calendar .rdp-month_caption {
+        padding: 0 2.9rem;
+    }
+}
+
+@keyframes calendarRevealMobile {
+    from {
+        opacity: 0;
+        transform: translateY(-48%) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    .amenity-card,
+    .plan-heading,
+    .plan-shimmer,
+    .planHeading,
+    .hero-background,
+    .hero-fade,
+    .royalway-calendar-popover {
+        animation: none;
+        opacity: 1;
+        transform: none;
+        filter: none;
+    }
+
+    @media (max-width: 640px) {
+        .royalway-calendar-popover {
+            transform: translateY(-50%);
+        }
+    }
+}
+
+/* =========================================================
+   ROYALWAYCC PREMIUM TIME PICKER
+   ========================================================= */
+
+.royalway-time-picker {
+    position: relative;
+    z-index: 40;
+    width: 100%;
+}
+
+.royalway-time-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.9rem;
+    cursor: pointer;
+    text-align: left;
+}
+
+.royalway-time-trigger:hover {
+    border-color: #bca264;
+    background:
+            linear-gradient(180deg, #fffdf8 0%, #fff8e9 100%);
+}
+
+.royalway-time-trigger-error {
+    border-color: #ef4444;
+}
+
+.royalway-time-value {
+    overflow: hidden;
+    color: #181713;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.royalway-time-placeholder {
+    overflow: hidden;
+    color: #9d968b;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.royalway-time-icon {
+    flex-shrink: 0;
+    color: #9d7623;
+    filter: drop-shadow(0 4px 8px rgb(157 118 35 / 15%));
+}
+
+.royalway-time-popover {
+    position: absolute;
+    z-index: 9999;
+    top: calc(100% + 0.85rem);
+    left: 0;
+    width: min(25rem, calc(100vw - 2rem));
+    max-height: 30rem;
+    overflow-y: auto;
+    border: 1px solid rgb(166 133 61 / 22%);
+    border-radius: 1.75rem;
+    background:
+            linear-gradient(
+                    180deg,
+                    rgb(255 255 255 / 97%),
+                    rgb(255 251 241 / 99%)
+            );
+    padding: 1rem;
+    color: #171717;
+    box-shadow:
+            0 30px 90px rgb(63 47 15 / 20%),
+            0 14px 36px rgb(63 47 15 / 11%),
+            inset 0 1px 0 rgb(255 255 255 / 90%);
+    backdrop-filter: blur(20px);
+    scrollbar-width: thin;
+    scrollbar-color: #c7ab65 transparent;
+    transform-origin: top left;
+    animation: calendarReveal 180ms ease-out both;
+}
+
+.royalway-time-popover::before {
+    position: absolute;
+    top: 0;
+    right: 1.5rem;
+    left: 1.5rem;
+    height: 1px;
+    background:
+            linear-gradient(
+                    90deg,
+                    transparent,
+                    rgb(201 162 39 / 55%),
+                    transparent
+            );
+    content: "";
+}
+
+.royalway-time-popover::-webkit-scrollbar {
+    width: 0.45rem;
+}
+
+.royalway-time-popover::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: #c7ab65;
+}
+
+.royalway-time-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid #eee3cf;
+    padding: 0.2rem 0.2rem 0.9rem;
+}
+
+.royalway-time-eyebrow {
+    margin: 0;
+    color: #9d7623;
+    font-size: 0.65rem;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.royalway-time-title {
+    margin: 0.25rem 0 0;
+    color: #201d17;
+    font-size: 1.1rem;
+    font-weight: 850;
+    letter-spacing: -0.035em;
+}
+
+.royalway-time-clear {
+    border: 0;
+    border-radius: 999px;
+    background: #f3e7c4;
+    padding: 0.45rem 0.75rem;
+    color: #795815;
+    font-size: 0.72rem;
+    font-weight: 850;
+    cursor: pointer;
+    transition:
+            background 150ms ease,
+            transform 150ms ease;
+}
+
+.royalway-time-clear:hover {
+    transform: translateY(-1px);
+    background: #ead8a5;
+}
+
+.royalway-time-groups {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.royalway-time-group {
+    border-radius: 1.15rem;
+    background: rgb(245 239 225 / 62%);
+    padding: 0.75rem;
+}
+
+.royalway-time-period {
+    margin: 0 0 0.6rem;
+    padding-left: 0.2rem;
+    color: #82786a;
+    font-size: 0.66rem;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.royalway-time-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
+}
+
+.royalway-time-option {
+    min-height: 2.55rem;
+    border: 1px solid #e4d8bd;
+    border-radius: 0.85rem;
+    background:
+            linear-gradient(180deg, #fffdf8 0%, #f8f1e2 100%);
+    padding: 0.5rem;
+    color: #4a4235;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow:
+            0 5px 12px rgb(77 57 14 / 5%),
+            inset 0 1px 0 rgb(255 255 255 / 85%);
+    transition:
+            transform 140ms ease,
+            border-color 140ms ease,
+            background 140ms ease,
+            color 140ms ease,
+            box-shadow 140ms ease;
+}
+
+.royalway-time-option:hover {
+    transform: translateY(-1px);
+    border-color: #c9ac65;
+    background:
+            linear-gradient(180deg, #fff8e8 0%, #efe0b7 100%);
+    color: #6d5116;
+    box-shadow:
+            0 8px 18px rgb(83 61 15 / 10%);
+}
+
+.royalway-time-option-selected {
+    border-color: #171914;
+    background:
+            linear-gradient(145deg, #272b23 0%, #171914 100%);
+    color: #fffdf8;
+    box-shadow:
+            0 10px 22px rgb(23 25 20 / 23%),
+            inset 0 1px 0 rgb(255 255 255 / 10%);
+}
+
+.royalway-time-option-selected:hover {
+    border-color: #171914;
+    background:
+            linear-gradient(145deg, #30352b 0%, #171914 100%);
+    color: #fffdf8;
+}
+
+.royalway-time-note {
+    margin: 0.9rem 0 0;
+    color: #8c8375;
+    font-size: 0.7rem;
+    font-weight: 650;
+    text-align: center;
+}
+
+/* Dark time picker */
+
+.dark .royalway-time-trigger:hover {
+    border-color: rgb(216 189 114 / 52%);
+    background:
+            linear-gradient(
+                    180deg,
+                    rgb(255 255 255 / 7%),
+                    rgb(216 189 114 / 7%)
+            );
+}
+
+.dark .royalway-time-value {
+    color: #f7f1e5;
+}
+
+.dark .royalway-time-placeholder {
+    color: rgb(255 255 255 / 38%);
+}
+
+.dark .royalway-time-icon {
+    color: #d8bd72;
+}
+
+.dark .royalway-time-popover {
+    border-color: rgb(216 189 114 / 18%);
+    background:
+            linear-gradient(
+                    180deg,
+                    rgb(31 34 28 / 98%),
+                    rgb(22 24 20 / 99%)
+            );
+    color: #f7f1e5;
+    box-shadow:
+            0 32px 100px rgb(0 0 0 / 48%),
+            0 12px 32px rgb(0 0 0 / 30%),
+            inset 0 1px 0 rgb(255 255 255 / 5%);
+    scrollbar-color: #d8bd72 transparent;
+}
+
+.dark .royalway-time-popover::before {
+    background:
+            linear-gradient(
+                    90deg,
+                    transparent,
+                    rgb(216 189 114 / 48%),
+                    transparent
+            );
+}
+
+.dark .royalway-time-popover::-webkit-scrollbar-thumb {
+    background: #d8bd72;
+}
+
+.dark .royalway-time-heading {
+    border-color: rgb(255 255 255 / 8%);
+}
+
+.dark .royalway-time-eyebrow {
+    color: #d8bd72;
+}
+
+.dark .royalway-time-title {
+    color: #f7f1e5;
+}
+
+.dark .royalway-time-clear {
+    background: rgb(216 189 114 / 12%);
+    color: #dfc477;
+}
+
+.dark .royalway-time-clear:hover {
+    background: rgb(216 189 114 / 18%);
+}
+
+.dark .royalway-time-group {
+    background: rgb(255 255 255 / 4%);
+}
+
+.dark .royalway-time-period {
+    color: rgb(255 255 255 / 38%);
+}
+
+.dark .royalway-time-option {
+    border-color: rgb(255 255 255 / 9%);
+    background:
+            linear-gradient(
+                    180deg,
+                    rgb(255 255 255 / 7%),
+                    rgb(255 255 255 / 3%)
+            );
+    color: rgb(255 255 255 / 75%);
+    box-shadow:
+            0 6px 14px rgb(0 0 0 / 16%),
+            inset 0 1px 0 rgb(255 255 255 / 4%);
+}
+
+.dark .royalway-time-option:hover {
+    border-color: rgb(216 189 114 / 30%);
+    background: rgb(216 189 114 / 10%);
+    color: #f3df9d;
+}
+
+.dark .royalway-time-option-selected {
+    border-color: #dfc477;
+    background:
+            linear-gradient(145deg, #ead596 0%, #caaa4f 100%);
+    color: #171914;
+    box-shadow:
+            0 10px 24px rgb(0 0 0 / 36%),
+            inset 0 1px 0 rgb(255 255 255 / 35%);
+}
+
+.dark .royalway-time-option-selected:hover {
+    border-color: #dfc477;
+    background:
+            linear-gradient(145deg, #f0dda1 0%, #d0b45e 100%);
+    color: #171914;
+}
+
+.dark .royalway-time-note {
+    color: rgb(255 255 255 / 36%);
+}
+
+@media (max-width: 640px) {
+    .royalway-time-popover {
+        position: fixed;
+        top: 50%;
+        right: 1rem;
+        left: 1rem;
+        width: auto;
+        max-width: 25rem;
+        max-height: min(78vh, 34rem);
+        margin: auto;
+        transform: translateY(-50%);
+        transform-origin: center;
+        border-radius: 1.65rem;
+        animation: calendarRevealMobile 180ms ease-out both;
+    }
+
+    .royalway-time-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 380px) {
+    .royalway-time-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+
+
+/* Keep the premium picker above booking cards and summaries. */
+.royalway-time-picker,
+.royalway-date-picker {
+    isolation: isolate;
+}
+
+.royalway-time-trigger,
+.royalway-date-trigger {
+    min-height: 3.5rem;
+}
+
+.royalway-time-trigger[aria-expanded="true"] {
+    border-color: #b68a2d;
+    background: #fffefb;
+    box-shadow:
+            0 0 0 4px rgb(182 138 45 / 12%),
+            0 12px 34px rgb(74 55 18 / 9%);
+}
+
+.dark .royalway-time-trigger[aria-expanded="true"] {
+    border-color: #d8bd72;
+    background: rgb(255 255 255 / 7%);
+    box-shadow:
+            0 0 0 4px rgb(216 189 114 / 11%),
+            0 14px 36px rgb(0 0 0 / 24%);
 }

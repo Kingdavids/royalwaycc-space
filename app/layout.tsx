@@ -3,6 +3,10 @@ import {
     Bricolage_Grotesque,
     Manrope,
 } from "next/font/google";
+
+import ThemeProvider from "@/app/components/ThemeProvider";
+import ThemeScript from "@/app/components/ThemeScript";
+
 import "./globals.css";
 
 const heading = Bricolage_Grotesque({
@@ -18,7 +22,7 @@ const body = Manrope({
 });
 
 const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
     "https://royalwaycc.org";
 
 export const metadata: Metadata = {
@@ -26,17 +30,18 @@ export const metadata: Metadata = {
 
     title: {
         default:
-            "Royalway Space | Event Hall Rental in Ellicott City, MD",
-        template: "%s | Royalway Space",
+            "RoyalwayCC Space | Event Hall Rental in Ellicott City, MD",
+        template: "%s | RoyalwayCC Space",
     },
 
     description:
-        "Reserve Royalway Space at 3239 Corporate Court in Ellicott City, Maryland. A flexible private event hall for church events, birthdays, baby showers, meetings, seminars, receptions, and community gatherings.",
+        "Reserve RoyalwayCC Space at 3239 Corporate Court in Ellicott City, Maryland. A flexible private event hall for church events, birthdays, baby showers, meetings, seminars, receptions, workshops, and community gatherings.",
 
-    applicationName: "Royalway Space",
+    applicationName: "RoyalwayCC Space",
 
     keywords: [
         "event hall Ellicott City",
+        "event venue Ellicott City MD",
         "event space Ellicott City MD",
         "hall rental Ellicott City",
         "venue rental Howard County",
@@ -46,9 +51,11 @@ export const metadata: Metadata = {
         "meeting space Ellicott City",
         "church event venue Maryland",
         "seminar venue Howard County",
+        "reception hall Ellicott City",
         "private event hall near Columbia MD",
-        "Royalway Space",
+        "community event space Maryland",
         "RoyalwayCC Space",
+        "Royalway Space",
     ],
 
     authors: [
@@ -64,24 +71,40 @@ export const metadata: Metadata = {
         canonical: "/",
     },
 
+    icons: {
+        icon: [
+            {
+                url: "/images/logo.png",
+                type: "image/png",
+            },
+        ],
+        shortcut: "/images/logo.png",
+        apple: [
+            {
+                url: "/images/logo.png",
+                type: "image/png",
+            },
+        ],
+    },
+
     openGraph: {
         type: "website",
         locale: "en_US",
         url: "/",
-        siteName: "Royalway Space",
+        siteName: "RoyalwayCC Space",
 
         title:
-            "Royalway Space | Event Hall Rental in Ellicott City, MD",
+            "RoyalwayCC Space | Event Hall Rental in Ellicott City, MD",
 
         description:
-            "A flexible private event hall in Ellicott City for celebrations, meetings, church events, seminars, receptions, and community gatherings.",
+            "Reserve a flexible private event hall in Ellicott City for celebrations, meetings, church events, seminars, receptions, workshops, and community gatherings.",
 
         images: [
             {
                 url: "/og-image.jpg",
                 width: 1200,
                 height: 630,
-                alt: "Royalway Space event hall in Ellicott City, Maryland",
+                alt: "RoyalwayCC Space event hall in Ellicott City, Maryland",
             },
         ],
     },
@@ -90,7 +113,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
 
         title:
-            "Royalway Space | Event Hall Rental in Ellicott City, MD",
+            "RoyalwayCC Space | Event Hall Rental in Ellicott City, MD",
 
         description:
             "Reserve a flexible private event hall in Ellicott City, Maryland.",
@@ -112,15 +135,6 @@ export const metadata: Metadata = {
     },
 
     category: "Event Venue",
-
-    other: {
-        "geo.region": "US-MD",
-        "geo.placename": "Ellicott City",
-        "geo.position": "39.2673;-76.7983",
-        ICBM: "39.2673, -76.7983",
-        telephone: "+1-240-879-6435",
-        email: "bookings@royalwaycc.org",
-    },
 };
 
 export default function RootLayout({
@@ -134,7 +148,15 @@ export default function RootLayout({
             className={`${heading.variable} ${body.variable}`}
             suppressHydrationWarning
         >
-        <body>{children}</body>
+        <head>
+            <ThemeScript />
+        </head>
+
+        <body className="font-sans antialiased">
+        <ThemeProvider>
+            {children}
+        </ThemeProvider>
+        </body>
         </html>
     );
 }
